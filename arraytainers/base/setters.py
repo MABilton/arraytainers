@@ -11,10 +11,9 @@ class Mixin:
             raise AttributeError(error_msg)
 
     def __setitem__(self, key, new_value):
-        key_type = type(key)
-        if issubclass(key_type, Arraytainer):
+        if self.is_container(new_value):
             self._set_with_container(key, new_value)
-        elif key_type in self.ARRAY_TYPES:
+        elif type(key) in self.supported_arrays:
             self._set_with_array(key, new_value)
         elif all(isinstance(val, slice) for val in always_iterable(key)):
             self._set_with_slices(key, new_value)
@@ -25,20 +24,20 @@ class Mixin:
             self._set_with_hash(key, new_value)    
 
     def _set_with_container(self, container, new_value):
-        value_is_container = issubclass(type(new_value), Arraytainer)
+        value_is_container = self.is_container(new_value)
         for container_key in self.keys():
             idx = container[container_key]
             value_i = new_value[container_key] if value_is_container else new_value
             self._set_array_item(container_key, idx, value_i)
 
     def _set_with_array(self, array_key, new_value):
-        value_is_container = issubclass(type(new_value), Arraytainer)
+        value_is_container = self.is_container(new_value)
         for container_key in self.keys():
             value_i = new_value[container_key] if value_is_container else new_value
             self._set_array_item(container_key, array_key, value_i)
 
     def _set_with_slices(self, slices, new_value):
-        value_is_container = issubclass(type(new_value), Arraytainer)
+        value_is_container = self.is_container(new_value)
         for container_key in self.keys():
             value_i = new_value[container_key] if value_is_container else new_value
             self._set_array_item(container_key, slices, value_i)

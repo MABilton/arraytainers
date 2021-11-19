@@ -1,13 +1,23 @@
-from np.lib.mixins import NDArrayOperatorsMixin
-from jaxlib.xla_extension import DeviceArray
+from numpy import ndarray
+from numpy.lib.mixins import NDArrayOperatorsMixin
+from . import getters, setters, iters, functions
 
-# Import methods defined in other files:
-import .get, .iters, .functions, .set
+def get_supported_arrays():
+  
+  supported_arrays = [ndarray]
+  
+  try:
+      from jax.numpy import DeviceArray
+      supported_arrays.append(DeviceArray)
+  except ModuleNotFoundError:
+      pass
+  
+  return tuple(supported_arrays)
 
-class Arraytainer(NDArrayOperatorsMixin, .get.Mixin, 
-                  .iters.Mixin, .functions.Mixin, .set.Mixin):
+class Arraytainer(NDArrayOperatorsMixin, getters.Mixin, 
+                  iters.Mixin, functions.Mixin, setters.Mixin):
 
-  ARRAY_TYPES = (np.ndarray, DeviceArray)
+  supported_arrays = get_supported_arrays()
 
   def __init__(self, contents, containerise_values=True):
     self.contents = contents
@@ -27,4 +37,7 @@ class Arraytainer(NDArrayOperatorsMixin, .get.Mixin,
   
   def copy(self):
     return self.__class__(self.contents.copy())
-
+  
+  @staticmethod
+  def is_container(input):
+    return issubclass(type(input), Arraytainer)

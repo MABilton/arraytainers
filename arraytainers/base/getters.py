@@ -1,15 +1,12 @@
 from more_itertools.more import always_iterable
-from .base import Arraytainer
-
 class Mixin:
     
     def __getitem__(self, key):
-        key_type = type(key) 
         # If indexing with an array container:
-        if issubclass(key_type, Arraytainer):
+        if self.is_container(key):
             item = self._index_with_container(key)
         # If indexing with an array:
-        elif key_type in self.ARRAY_TYPES:
+        elif type(key) in self.supported_arrays:
             item = self._index_with_array(key)
         # If indexing using a slice or tuple of slices:
         elif all(isinstance(val, slice) for val in always_iterable(key)):

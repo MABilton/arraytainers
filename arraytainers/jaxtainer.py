@@ -3,11 +3,11 @@ from jax.tree_util import register_pytree_node_class, tree_flatten, tree_unflatt
 from .base.base import Arraytainer
 
 @register_pytree_node_class
-class JaxContainer(Arraytainer):
+class Jaxtainer(Arraytainer):
 
     # May want only floats stored for autograd purposes:    
     def __init__(self, contents, convert_to_jax=True, floats_only=False, containerise_values=True):
-        super().__init__(contents, nested_containers)
+        super().__init__(contents, containerise_values)
         if convert_to_jax:
           self._convert_contents_to_jax(floats_only)
 
@@ -15,7 +15,7 @@ class JaxContainer(Arraytainer):
         # Check that everything can be converted to Jax Numpy array:
         for i, key_i in enumerate(self.keys()):
             element_i = self.contents[key_i]
-            if not issubclass(type(element_i), Arraytainer):
+            if not self.is_container(element_i):
               # Try convert element_i to jax.numpy array if requested:
               try:
                   element_i = jnp.array(element_i)
@@ -60,8 +60,8 @@ class JaxContainer(Arraytainer):
       return kwargs
 
     def _find_containers(self, args, kwargs):
-      containers_in_args = [issubclass(type(arg_i), Arraytainer) for arg_i in args]
-      containers_in_kwargs = [issubclass(type(arg_i), Arraytainer) for arg_i in kwargs.values()]
+      containers_in_args = [self.is_container(arg_i) for arg_i in args]
+      containers_in_kwargs = [self.is_container(arg_i) for arg_i in kwargs.values()]
       includes_containers = any(containers_in_args) or any(containers_in_kwargs)
       return includes_containers
 
@@ -87,11 +87,11 @@ def find_method(module, func, submodule_to_search=('', 'linalg', 'fft')):
     method_name = str(func.__name__)
     modules_to_search = [getattr(module, submodule, module) for submodule in submodule_to_search]
     for i, mod in enumerate(modules_to_search):
-    try:
-        found_method = getattr(mod, method_name)
-        break
-    except AttributeError:
-        if i == len(submodule_to_search)-1:
-        error_msg = f'The {method_name} method is not implemented in {module}.'
-        raise AttributeError(error_msg)
+      try:
+          found_method = getattr(mod, method_name)
+          break
+      except AttributeError:
+          if i == len(submodule_to_search)-1:
+            error_msg = f'The {method_name} method is not implemented in {module}.'
+            raise AttributeError(error_msg)
     return found_method

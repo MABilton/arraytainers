@@ -1,6 +1,7 @@
 import numpy as np
 from .base.base import Arraytainer
 
+
 class Numpytainer(Arraytainer):
 
   def __init__(self, contents, containerise_values=True):
@@ -10,7 +11,7 @@ class Numpytainer(Arraytainer):
   def _convert_contents_to_numpy(self):
     for i, key_i in enumerate(self.keys()):
       contents_i = self.contents[key_i]
-      if not issubclass(type(contents_i), Arraytainer):
+      if not self.is_container(contents_i):
         try:
           self.contents[key_i] = np.array(contents_i)
         except TypeError:
