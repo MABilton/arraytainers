@@ -20,7 +20,7 @@ class Arraytainer(NDArrayOperatorsMixin, getters.Mixin,
   supported_arrays = get_supported_arrays()
 
   def __init__(self, contents, containerise_values=True):
-    self.contents = contents
+    self.contents = contents.copy()
     self._type = dict if hasattr(self.contents, 'keys') else list     
     # If nested dictionaries, convert all of these:
     if containerise_values:

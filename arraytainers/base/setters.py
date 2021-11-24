@@ -44,7 +44,7 @@ class Mixin:
 
     def _set_array_item(self, key, idx, value_i):
         error_msg = '''Cannot use array to set value with base Arraytainer class;
-                    use a Numpytainer or Jaxtainer instead.'''
+                       use a Numpytainer or Jaxtainer instead.'''
         return KeyError(error_msg)
 
     def _set_with_hash(self, key, new_value):

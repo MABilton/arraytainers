@@ -13,7 +13,7 @@ class Mixin:
             item = self._index_with_slices(key)
         # If we're given a tuple of integers:
         elif isinstance(key, tuple) and all(isinstance(val, int) for val in always_iterable(key)):
-            self._set_with_slices(key, new_value)
+            self._index_with_slices(key)
         # Index using a regular hash:
         else:
             item = self._index_with_hash(key)
