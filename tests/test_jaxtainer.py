@@ -1,12 +1,12 @@
 import jax.numpy as jnp
 from arraytainers import Jaxtainer
 
-from .test_class import ArraytainerTests
+from test_class import ArraytainerTests
 
-class JaxtainerTests(ArraytainerTests):
+class TestJaxtainer(ArraytainerTests):
     
-    self.container_class = Jaxtainer
-    self.array = jnp.array
+    container_class = Jaxtainer
+    array = jnp.array
 
     # def test_vmap():
 

@@ -1,9 +1,9 @@
 import numpy as np
 from arraytainers import Numpytainer
 
-from .test_class import ArraytainerTests
+from test_class import ArraytainerTests
 
-class NumpytainerTests(ArraytainerTests):
-    
-    self.container_class = Numpytainer
-    self.array = np.array
+class TestNumpytainer(ArraytainerTests):
+
+    container_class = Numpytainer
+    array = np.array
