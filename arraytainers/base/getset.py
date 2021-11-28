@@ -28,7 +28,7 @@ class GetterMixin:
     def _index_with_container(self, key_container):
         item = self.copy()
         for container_key in self.keys():
-            array_key = key_container[container_key]
+            array_key = key_container[container_key]  
             item[container_key] = self.contents[container_key][self.array(array_key)]
         return item
 
@@ -70,7 +70,7 @@ class SetterMixin:
             raise AttributeError(' '.join(error_msg))
 
     def __setitem__(self, key, new_value):
-        if self.is_container(new_value):
+        if self.is_container(key):
             self._set_with_container(key, new_value)
         elif self.is_array(key):
             self._set_with_array(key, new_value)
@@ -80,22 +80,19 @@ class SetterMixin:
             self._set_with_hash(key, new_value)    
 
     def _set_with_container(self, container, new_value):
-        value_is_container = self.is_container(new_value)
         for container_key in self.keys():
             idx = container[container_key]
-            value_i = new_value[container_key] if value_is_container else new_value
+            value_i = new_value[container_key] if self.is_container(new_value) else new_value
             self._set_array_item(container_key, idx, value_i)
 
     def _set_with_array(self, array_key, new_value):
-        value_is_container = self.is_container(new_value)
         for container_key in self.keys():
-            value_i = new_value[container_key] if value_is_container else new_value
+            value_i = new_value[container_key] if self.is_container(new_value) else new_value
             self._set_array_item(container_key, array_key, value_i)
 
     def _set_with_slices(self, slices, new_value):
-        value_is_container = self.is_container(new_value)
         for container_key in self.keys():
-            value_i = new_value[container_key] if value_is_container else new_value
+            value_i = new_value[container_key] if self.is_container(new_value) else new_value
             self._set_array_item(container_key, slices, value_i)
 
     def _set_array_item(self, key, idx, value_i):

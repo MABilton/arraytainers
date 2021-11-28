@@ -21,7 +21,6 @@ class Mixin:
       keys = contents.keys()
     except AttributeError:
       keys = range(len(contents))
-    keys = tuple(keys)
 
     can_convert = {}
 
@@ -59,7 +58,7 @@ class Mixin:
         contents[key] = self.array(contents[key]) if covert_flag else contents[key]
     # If we have only one convertable val, convert that val:
     elif len(keys)==1:
-      first_key = keys[0]
+      first_key = tuple(keys)[0]
       contents[first_key] = self.array(contents[first_key])
 
     return (contents, can_convert_all_vals)

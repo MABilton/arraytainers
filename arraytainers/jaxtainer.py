@@ -8,7 +8,7 @@ class Jaxtainer(Arraytainer):
 
     # May want only floats stored for autograd purposes:    
     def __init__(self, contents, convert_to_jax=True, floats_only=False, containerise_contents=True):
-        
+
         super().__init__(contents)
         
         self.array_class = (lambda x : jnp.array(x).astype(float)) if floats_only else jnp.array

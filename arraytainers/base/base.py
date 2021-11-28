@@ -25,7 +25,12 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin,
     supported_arrays = get_supported_arrays()
 
     def __init__(self, contents):
-        contents = list(contents) if isinstance(contents, tuple) else contents
+        
+        if not hasattr(contents, '__len__'):
+            contents = [contents]
+        elif isinstance(contents, tuple):
+            contents = list(contents)
+
         self.contents = deepcopy(contents)
         self._type = dict if hasattr(self.contents, 'keys') else list
         self.check_keys()
@@ -44,6 +49,11 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin,
     def array(self, x):
         if self.is_container(x):
             return x
+        elif self.is_array(x):
+            # Coverting from Jax to Numpy array can change shape:
+            before_shape = x.shape
+            x = self.array_class(x)
+            return x.reshape(before_shape)
         else:
             return self.array_class(x)
 
@@ -86,23 +96,28 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin,
         return self.sum_elements() if elements else self.sum_arrays()
 
     def sum_elements(self):
+        
         if len(self.keys()) > 0:
             sum_results = functools.reduce(lambda x,y: x+y, [val for val in self.values()])
         else:
             sum_results = 0
+
+        if not self.is_container(sum_results):
+            sum_results =   self.__class__(sum_results)
+
         return sum_results
 
     def sum_arrays(self):
         to_sum = self.list_arrays()
-        return sum(to_sum)
+        return self.array(sum(to_sum))
 
     # Type-checking methods:
     def is_array(self, val):
         return isinstance(val, self.supported_arrays)
-
+        
     @staticmethod
     def is_container(val):
-        return issubclass(type(val), Arraytainer)
+        return isinstance(val, Arraytainer)
 
     # Shape methods:
     @property
@@ -114,8 +129,7 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin,
 
     @property
     def shape_container(self):
-        shapes = self.shape
-        return self.__class__(shapes)
+        return self.__class__(self.shape)
 
     # Convert arraytainer back to 'normal' dicts/lists:
     @property
