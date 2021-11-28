@@ -1,3 +1,5 @@
 # Required to install package in -e mode:
 from setuptools import setup
-setup()
+
+if __name__=='__main__':
+    setup()

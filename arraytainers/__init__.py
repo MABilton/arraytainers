@@ -10,4 +10,4 @@ except ImportError:
     warn(warning_msg)
 
 # Clean-up namespace of module:
-del warn, base, numpytainer, jaxtainer
+del warn, numpytainer, jaxtainer

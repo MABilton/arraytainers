@@ -1,23 +1,18 @@
 import numpy as np
 from .base.base import Arraytainer
 
-
 class Numpytainer(Arraytainer):
 
-  def __init__(self, contents, containerise_values=True):
-      super().__init__(contents, containerise_values)
-      self._convert_contents_to_numpy()
+  def __init__(self, contents, containerise_contents=True):
 
-  def _convert_contents_to_numpy(self):
-    for i, key_i in enumerate(self.keys()):
-      contents_i = self.contents[key_i]
-      if not self.is_container(contents_i):
-        try:
-          self.contents[key_i] = np.array(contents_i)
-        except TypeError:
-          error_msg = f"""Element {i} of type {type(contents_i)} 
-                          cannot be converted to numpy array."""
-          raise TypeError(error_msg)
+      super().__init__(contents)
+      
+      self.array_type = np.ndarray
+      self.array_class = np.array
+
+      self._convert_contents_to_arrays()
+      if containerise_contents:
+        self._containerise_contents()
 
   # Over-rided method definitions:
   def _manage_function_call(self, func, types, *args, **kwargs):
@@ -34,14 +29,11 @@ class Numpytainer(Arraytainer):
     
     if self._type is list:
       output_list = list(output_dict.values())
-      output_container = NumpyContainer(output_list)
+      output_container = self.__class__(output_list)
     else:
-        output_container = NumpyContainer(output_dict)
+        output_container = self.__class__(output_dict)
 
     return output_container
 
   def _set_array_item(self, container_key, idx, value_i):
     self.contents[container_key][self.array(idx)] = value_i
-  
-  def array(self, in_array):
-    return np.array(in_array)

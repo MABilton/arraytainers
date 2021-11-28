@@ -1,3 +1,4 @@
+import numpy as np
 import jax.numpy as jnp
 from jax.tree_util import register_pytree_node_class, tree_flatten, tree_unflatten
 from .base.base import Arraytainer
@@ -6,27 +7,17 @@ from .base.base import Arraytainer
 class Jaxtainer(Arraytainer):
 
     # May want only floats stored for autograd purposes:    
-    def __init__(self, contents, convert_to_jax=True, floats_only=False, containerise_values=True):
-        super().__init__(contents, containerise_values)
-        if convert_to_jax:
-          self._convert_contents_to_jax(floats_only)
+    def __init__(self, contents, convert_to_jax=True, floats_only=False, containerise_contents=True):
 
-    def _convert_contents_to_jax(self, floats_only):
-        # Check that everything can be converted to Jax Numpy array:
-        for i, key_i in enumerate(self.keys()):
-            element_i = self.contents[key_i]
-            if not self.is_container(element_i):
-              # Try convert element_i to jax.numpy array if requested:
-              try:
-                  element_i = jnp.array(element_i)
-                  if floats_only:
-                      element_i = element_i.astype(float)
-              except TypeError:
-                  error_msg = f"""Element {i} of type {type(element_i)} 
-                                  cannot be converted to jax.numpy array."""
-                  raise TypeError(error_msg)
-              self.contents[key_i] = element_i
-    
+        super().__init__(contents)
+        
+        self.array_class = (lambda x : jnp.array(x).astype(float)) if floats_only else jnp.array
+        self.array_type = jnp.DeviceArray
+
+        if convert_to_jax:
+          self._convert_contents_to_arrays()
+        if containerise_contents:
+          self._containerise_contents()
 
     # Over-rided method definitions:
     def _manage_function_call(self, func, types, *args, **kwargs):
@@ -41,15 +32,16 @@ class Jaxtainer(Arraytainer):
         
         # Check to see if args or kwargs contains a container type:
         includes_containers = self._find_containers(args_i, kwargs_i)
+
         # If function call does not include containers, we need to remove any 'out' kwargs:
-        method = self.find_method(jnp, func) if not includes_containers else self.find_method(np, func)
+        method = find_method(jnp, func) if not includes_containers else find_method(np, func)
         output_dict[key] = method(*args_i, **kwargs_i)
 
       if self._type is list:
         output_list = list(output_dict.values())
-        output_container = JaxContainer(output_list)
+        output_container = self.__class__(output_list)
       else:
-        output_container = JaxContainer(output_dict)
+        output_container = self.__class__(output_dict)
 
       return output_container
     
@@ -72,16 +64,13 @@ class Jaxtainer(Arraytainer):
     @classmethod
     def tree_unflatten(cls, aux_data, children):
       try:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_inputs=True, containerise_values=True)
+        unflattened = cls(tree_unflatten(aux_data, children), convert_to_jax=True, containerise_content=True)
       except TypeError:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_inputs=False, containerise_values=False)
+        unflattened = cls(tree_unflatten(aux_data, children), convert_to_jax=False, containerise_content=False)
       return unflattened
 
     def _set_array_item(self, container_key, idx, value_i):
       self.contents[container_key] = self.contents[container_key].at[idx].set(value_i)
-
-    def array(self, in_array):
-      return jnp.array(in_array)
 
 def find_method(module, func, submodule_to_search=('', 'linalg', 'fft')):
     method_name = str(func.__name__)
@@ -92,6 +81,5 @@ def find_method(module, func, submodule_to_search=('', 'linalg', 'fft')):
           break
       except AttributeError:
           if i == len(submodule_to_search)-1:
-            error_msg = f'The {method_name} method is not implemented in {module}.'
-            raise AttributeError(error_msg)
+            raise AttributeError(f'The {method_name} method is not implemented in {module}.')
     return found_method
