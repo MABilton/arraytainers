@@ -1,9 +1,8 @@
 import pytest
 import numpy as np
 from itertools import product
-from copy import deepcopy
 
-from .utils import apply_func_to_contents, assert_equal_values, assert_same_types, flatten_contents, sum_elements
+from .utils import apply_func_to_contents, assert_equal_values, assert_same_types, get_keys
 
 ARRAY_CONVERSION = {
 'lone_numbers': [ 
@@ -39,7 +38,7 @@ ARRAY_CONVERSION = {
 #                          ({'a': (2,3), 'b': (3,2)}, {'a':(3,2),'b':(2,3)}, None),
 #                          ({'a': [{'x': (12,)}], 'b': [{'a': (3,2)}]}, {'a': [{'x': (2,6)}], 'b': [{'a': (6,1)}]}, None),
 #                          ({'a': [{'x': (12,), 'y': (2,6)}], 'b':[{'a': (3,2)}]} {'a':(3,4), 'b':(12,1)}, None)
-
+#     'container_broadcasting':
 #     ]
 # }
 
@@ -95,13 +94,20 @@ class ArrayMixin:
 
         arraytainer = self.container_class(bool_contents)
 
-        array_list = flatten_contents(bool_contents)
+        array_list = get_list_of_arrays(bool_contents)
 
         assert arraytainer.all() == all([np.all(x) for x in array_list])
         assert arraytainer.any() == any([np.any(x) for x in array_list])
 
-    # def test_reshape_and_flatten():
-    
+    # @pytest.mark.parametrize('contents, new_shape, new_shape_is_container, exception', 
+    #                          [val_i for val in ARRAY_CONVERSION.values() for val_i in val], 
+    #                          ids=[key for key, val in ARRAY_CONVERSION.items() for _ in val])
+    # def test_reshape_and_flatten(contents, new_shape, exception):
+    #     arraytainer = self.container_class(contents)
+
+    #     if not isinstance(new_shape, tuple):
+    #         new_shape = self.container_class(new_shape)
+
     @pytest.mark.parametrize('contents_in, expected', [val_i for val in ARRAY_CONVERSION.values() for val_i in val], 
                                                     ids=[key for key, val in ARRAY_CONVERSION.items() for _ in val])
     def test_array_conversion(self, contents_in, expected):
@@ -109,23 +115,23 @@ class ArrayMixin:
         assert_equal_values(arraytainer.unpacked, expected)
         assert_same_types(arraytainer, self.container_class(expected))
 
-    @pytest.mark.parametrize('contents, exception', [val_i for val in SUM_ELEMENTS_CASES.values() for val_i in val], 
-                                                    ids=[key for key, val in SUM_ELEMENTS_CASES.items() for _ in val],
-                                                    indirect=['contents'])
-    def test_array_methods_sum_elements(self, contents, exception):
+    # @pytest.mark.parametrize('contents, exception', [val_i for val in SUM_ELEMENTS_CASES.values() for val_i in val], 
+    #                                                 ids=[key for key, val in SUM_ELEMENTS_CASES.items() for _ in val],
+    #                                                 indirect=['contents'])
+    # def test_array_methods_sum_elements(self, contents, exception):
         
-        arraytainer = self.container_class(contents)
+    #     arraytainer = self.container_class(contents)
 
-        if exception is None:
-            expected = sum_elements(contents)
-            # If expected is an integer value (i.e. if it's 0):
-            expected = [expected] if not hasattr(expected, '__len__') else expected
-            result = arraytainer.sum_elements()
-            # For comparisons, need to 'unpack' sum_result if it's an arraytainer:
-            assert_equal_values(result.unpacked, expected)
-            assert_same_types(result, self.container_class(expected))
-        else:
-            self.assert_exception(lambda x: x.sum_elements(), exception, arraytainer)
+    #     if exception is None:
+    #         expected = sum_elements(contents)
+    #         # If expected is an integer value (i.e. if it's 0):
+    #         expected = [expected] if not hasattr(expected, '__len__') else expected
+    #         result = arraytainer.sum_elements()
+    #         # For comparisons, need to 'unpack' sum_result if it's an arraytainer:
+    #         assert_equal_values(result.unpacked, expected)
+    #         assert_same_types(result, self.container_class(expected))
+    #     else:
+    #         self.assert_exception(lambda x: x.sum_elements(), exception, arraytainer)
 
     @pytest.mark.parametrize('contents,exception', [val_i for val in SUM_ARRAYS_CASES.values() for val_i in val], 
                                                     ids=[key for key, val in SUM_ARRAYS_CASES.items() for _ in val],
@@ -135,10 +141,46 @@ class ArrayMixin:
         arraytainer = self.container_class(contents)
         
         if exception is None:
-            array_list = flatten_contents(contents)
+            array_list = get_list_of_arrays(contents)
             expected = sum(array_list)
             result = arraytainer.sum_arrays()
             assert np.allclose(result, expected)
             assert any([isinstance(result, type_i) for type_i in self.array_types])
         else:
             self.assert_exception(lambda x: x.sum_arrays(), exception, arraytainer)
+
+# Helper functions:
+
+# Adds up all of the elements in an (unpacked):
+def sum_elements(contents):
+
+    keys = get_keys(contents)
+    content_list = [contents[key] for key in keys]
+    
+    array_elems = {key:val for key, val in zip(keys,content_list) if isinstance(val, ARRAY_TYPES)}
+    nonarray_elems = [val for key,val in zip(keys,content_list) if key not in array_elems.keys()]
+    array_elems = array_elems.values()
+    
+    if not nonarray_elems:
+        sum_result = sum(content_list)
+    else:
+        elem_keys = get_keys(nonarray_elems[0])
+        sum_result = {key: sum_elements([*[val[key] for val in nonarray_elems], 
+                                         *[val for val in array_elems]]) 
+                     for key in elem_keys}
+        if isinstance(nonarray_elems[0], list):
+            sum_result = list(sum_result.values())
+    return sum_result
+
+def get_list_of_arrays(contents, array_list=None):
+
+    array_list = [] if array_list is None else array_list
+    keys = get_keys(contents)
+
+    for key in keys:
+        if isinstance(contents[key], (dict, list)):
+            array_list = get_list_of_arrays(contents[key], array_list)
+        else:
+            array_list.append(contents[key])
+    
+    return array_list
