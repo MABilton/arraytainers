@@ -13,9 +13,9 @@ INDEX_HASH = \
                             [('a',None),('b',None),(0,'key_error'),('c','key_error')])}
 
 INDEX_SLICE = \
-{'simple_dict': create_idx_combos({'a':(6,),'b':(7,)}, [(slice(0,0),None), (slice(1,5,2),None),(slice(1,10,2),None),
+{'simple_dict': create_idx_combos({'a':(6,),'b':(7,)}, [(slice(1),None), (slice(1,5),None),(slice(1,10,2),None),
                                     ((slice(1,5,2), slice(1,5,2)),'key_error')]),
-    'simple_list': create_idx_combos([(3,3),(2,2)], [(slice(0,0),None), (slice(0,2),None), ((slice(0,2),slice(0,2)),None)]),
+    'simple_list': create_idx_combos([(3,3),(2,2)], [(slice(1),None), (slice(0,2),None), ((slice(0),slice(0,2)),None)]),
     'nested_list': create_idx_combos([[(2,2,2), (2,)],(2,1)], [(slice(0,2), None), ((slice(0,0),slice(0,0)),'key_error')]),
     'nested_dict': create_idx_combos({'a':(2,1),'b':{'c':(2,2),'d':(2,)},'c':(1,1)}, 
                                     [(slice(0,2), None), ((slice(0,0),slice(0,0)),'key_error')]),

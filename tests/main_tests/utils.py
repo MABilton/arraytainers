@@ -2,6 +2,7 @@
 import numpy as np
 import jax.numpy as jnp
 import jaxlib
+from arraytainers import Numpytainer, Jaxtainer
 
 from itertools import product
 
@@ -11,8 +12,39 @@ NUM_TYPES = (np.float32, np.float64)
 def create_idx_combos(contents, key_error_tuples):
     return [(contents, key, error) for contents, (key, error) in product((contents,), key_error_tuples)]
 
+def assert_same_types(arraytainer_1, arraytainer_2, container_class=None, check_args=True):
+
+    inputs_not_arraytainers = [not isinstance(x, (Numpytainer, Jaxtainer)) for x in (arraytainer_1, arraytainer_2)]
+
+    if any(inputs_not_arraytainers):
+        raise TypeError('Must pass arraytainers to assert_same_types.')
+
+    try:
+        assert_same_types_recursive(arraytainer_1, arraytainer_2, container_class=arraytainer_1.__class__, check_args=True)
+    except Exception as e:
+        raise Exception(f'Arraytainers {arraytainer_1} and {arraytainer_2} do not contain the same types')
+        
+def assert_same_types_recursive(arraytainer_1, arraytainer_2, container_class, check_args):
+
+    if check_args:
+        assert type(arraytainer_1) == type(arraytainer_2)
+    
+    for key in arraytainer_1.keys():
+        arg_is_num = [isinstance(x, NUM_TYPES) for x in (arraytainer_1[key], arraytainer_2[key])]
+        if any(arg_is_num):
+            assert all(arg_is_num)
+        else:
+            assert type(arraytainer_1[key]) == type(arraytainer_2[key]) 
+        if isinstance(arraytainer_1[key], container_class):
+            assert_same_types_recursive(arraytainer_1[key], arraytainer_2[key], container_class=container_class, check_args=False)
+
 def assert_equal_values(contents_1, contents_2, approx_equal=True):
   
+  inputs_are_arraytainers = [isinstance(x, (Numpytainer, Jaxtainer)) for x in (contents_1, contents_2)]
+
+  if any(inputs_are_arraytainers):
+      raise TypeError('Must pass unpacked version of arraytainer to assert_equal_values.')
+
   def assert_func(contents_1, contents_2):
     if approx_equal:
         # Need to adjust atol and rtol because, by default, Jax uses 32 bit numbers which means,
@@ -21,32 +53,11 @@ def assert_equal_values(contents_1, contents_2, approx_equal=True):
     else:
       assert contents_1 == contents_2
 
-  apply_func_to_contents(contents_1, contents_2, func=assert_func, throw_exception=True)
+  try:
+      apply_func_to_contents(contents_1, contents_2, func=assert_func, throw_exception=True)
+  except Exception:
+      raise Exception(f'Values {contents_1} and {contents_2} not equal')
 
-def assert_same_types(arraytainer_1, arraytainer_2, container_class=None, check_args=True):
-    
-    arg_is_array = [isinstance(x, ARRAY_TYPES) for x in (arraytainer_1, arraytainer_2)]
-
-    if container_class is None:
-        container_class = arraytainer_1.__class__
-
-    if check_args:
-        if any(arg_is_array):
-            assert all(arg_is_array)
-        else:
-            assert type(arraytainer_1) == type(arraytainer_2)
-    
-    for key in arraytainer_1.keys():
-        arg_is_array = [isinstance(x, ARRAY_TYPES) for x in (arraytainer_1[key], arraytainer_2[key])]
-        arg_is_num = [isinstance(x, NUM_TYPES) for x in (arraytainer_1[key], arraytainer_2[key])]
-        if any(arg_is_array):
-            assert all(arg_is_array)
-        elif any(arg_is_num):
-            assert all(arg_is_num)
-        else:
-            assert type(arraytainer_1[key]) == type(arraytainer_2[key]) 
-        if isinstance(arraytainer_1[key], container_class):
-            assert_same_types(arraytainer_1[key], arraytainer_2[key], container_class=container_class, check_args=False)
 
 def apply_func_to_contents(*contents, func=None, args=(), kwargs=None, index_args=None, 
                             return_list=False, throw_exception=False):

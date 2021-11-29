@@ -44,12 +44,6 @@ class GetterMixin:
             item[container_key] = self.contents[container_key][slices]
         return item
 
-    @staticmethod
-    def array(in_array):
-        error_msg = ('Base Arraytainer class does not have an array method;', 
-                     'instead, use a Numpytainer or Jaxtainer.')
-        return TypeError(' '.join(error_msg))
-
     def _index_with_hash(self, key):
         try:
             item = self.contents[key]

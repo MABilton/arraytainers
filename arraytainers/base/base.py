@@ -1,11 +1,10 @@
-from copy import deepcopy
 import functools
 
 import numpy as np
 from numpy import ndarray
 from numpy.lib.mixins import NDArrayOperatorsMixin
 
-from . import getset, func_handlers, preprocess
+from . import getset, func_handlers, preprocess, arrays
 
 def get_supported_arrays():
   
@@ -19,19 +18,20 @@ def get_supported_arrays():
   
   return tuple(supported_arrays)
 
-class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, 
+class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin, 
                   getset.SetterMixin, func_handlers.Mixin, preprocess.Mixin):
 
     supported_arrays = get_supported_arrays()
 
     def __init__(self, contents):
-        
+
         if not hasattr(contents, '__len__'):
             contents = [contents]
         elif isinstance(contents, tuple):
             contents = list(contents)
 
-        self.contents = deepcopy(contents)
+        # Need to be careful when copying Jax arrays - this actually returns a Numpy array:
+        self.contents = contents.copy()
         self._type = dict if hasattr(self.contents, 'keys') else list
         self.check_keys()
 
@@ -43,23 +43,7 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin,
         return f"{self.__class__.__name__}({repr(self.unpacked)})"
 
     def copy(self):
-        return self.__class__(deepcopy(self.contents))
-
-    # Array methods/proprties:
-    def array(self, x):
-        if self.is_container(x):
-            return x
-        elif self.is_array(x):
-            # Coverting from Jax to Numpy array can change shape:
-            before_shape = x.shape
-            x = self.array_class(x)
-            return x.reshape(before_shape)
-        else:
-            return self.array_class(x)
-
-    @property
-    def T(self):
-        return np.transpose(self)
+        return self.__class__(self.contents.copy())
 
     # Key/Item methods:
     def keys(self):
@@ -77,40 +61,6 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin,
         contents = self.unpacked if unpacked else self
         return tuple((key, contents[key]) for key in self.keys())
 
-    # Calculation methods:
-    def all(self):
-        for key in self.keys():
-            if self.contents[key].all():
-                continue
-            else:
-                return False
-        return True
-
-    def any(self):
-        for key in self.keys():
-            if self.contents[key].any():
-                return True
-        return False
-
-    def sum(self, elements=True):
-        return self.sum_elements() if elements else self.sum_arrays()
-
-    def sum_elements(self):
-        
-        if len(self.keys()) > 0:
-            sum_results = functools.reduce(lambda x,y: x+y, [val for val in self.values()])
-        else:
-            sum_results = 0
-
-        if not self.is_container(sum_results):
-            sum_results =   self.__class__(sum_results)
-
-        return sum_results
-
-    def sum_arrays(self):
-        to_sum = self.list_arrays()
-        return self.array(sum(to_sum))
-
     # Type-checking methods:
     def is_array(self, val):
         return isinstance(val, self.supported_arrays)
@@ -119,27 +69,18 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin,
     def is_container(val):
         return isinstance(val, Arraytainer)
 
-    # Shape methods:
-    @property
-    def shape(self):
-        shapes = [self[key].shape for key in self.keys()]
-        if self._type is dict:
-            shapes = dict(zip(self.keys(), shapes))
-        return shapes
-
-    @property
-    def shape_container(self):
-        return self.__class__(self.shape)
-
     # Convert arraytainer back to 'normal' dicts/lists:
-    @property
-    def unpacked(self):
+    def unpack(self):
         output = [val.unpacked if self.is_container(val) else val
-                  for val in self.values()]
+                    for val in self.values()]
         if self._type is dict:
             output = dict(zip(self.keys(), output))
         return output
-    
+
+    @property
+    def unpacked(self):
+        return self.unpack()
+
     # Returns list of all arrays in arraytainer:
     def list_arrays(self):
         unpacked = self.unpacked

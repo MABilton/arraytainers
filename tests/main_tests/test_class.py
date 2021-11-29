@@ -1,4 +1,5 @@
 import pytest
+from jax.core import InconclusiveDimensionOperation
 
 from .test_array_methods import ArrayMixin
 from .test_functions import FunctionMixin
@@ -19,8 +20,8 @@ class ArraytainerTests(ArrayMixin, FunctionMixin, IndexMixin, IterableMixin):
             # Group errors according to 'functionally equivalent' groupings:
             testing_numpytainer = 'numpy' in self.container_class.__name__.lower()
             error_groupings = {'key': (IndexError, KeyError, TypeError), # Thrown by indexing/key errors
-                               'broadcast': (ValueError,) if testing_numpytainer else (TypeError,)} # Thrown by broadcasting errors
-
+                               'broadcast': (ValueError,) if testing_numpytainer else (TypeError,) # Thrown by broadcasting errors
+                               'reshape': (ValueError, InconclusiveDimensionOperation)}
             for key, group in error_groupings.items(): 
                 if key in exception.lower():
                     exception_class = group

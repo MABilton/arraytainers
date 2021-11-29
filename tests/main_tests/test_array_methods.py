@@ -1,30 +1,61 @@
 import pytest
 import numpy as np
 from itertools import product
+from copy import deepcopy
 
 from .utils import apply_func_to_contents, assert_equal_values, assert_same_types, flatten_contents, sum_elements
 
-ARRAY_CONVERSION = \
-{'lone_numbers': [(1, [np.array(1)]), (-1.5, [np.array(-1.5)])],
-'simple_lists': [([[2]], [np.array([[2]])])],
-'simple_dicts': [({'a': 2}, {'a': np.array(2)})],
-'list_with_array': [([[np.array(2)]], [[np.array(2)]])],
-'list_with_dict_and_list': [([{'a': 2}, [[2,2],[2,2]]], [{'a': np.array(2)}, np.array([[2,2],[2,2]])])],
-'dict_with_convertible_contents': [({'a':[[2]],'b':{'c':[3]}}, {'a':np.array([[2]]),'b':{'c':np.array([3])}}),
-                                ({'a':[[np.array(2)]],'b':{'c':[3]}}, {'a':[[np.array(2)]],'b':{'c':np.array([3])}})]}
+ARRAY_CONVERSION = {
+'lone_numbers': [ 
+                   (1, [np.array(1)]), 
+                   (-1.5, [np.array(-1.5)]) 
+                ],
+'simple_lists': [ 
+                  ([[2]], [np.array([[2]])]), 
+                  ([[1,2]], [np.array([1,2])]), 
+                  ([[1,2],[3,4]], [np.array([1,2]),np.array([3,4])]),
+                  ([[[1,2],[3,4]]], [np.array([[1,2],[3,4]])]) 
+                ],
+'simple_dicts': [
+                 ({'a': 2}, {'a': np.array(2)}), 
+                 ({'a':2,'b': [[3]]}, {'a':np.array(2),'b':np.array([[3]])})
+                ],
+'list_with_array': [ ([[np.array(2)]], [[np.array(2)]]) ],
+'list_with_dict_and_list': [ ([{'a': 2}, [[2,2],[2,2]]], [{'a': np.array(2)}, np.array([[2,2],[2,2]])]) ],
+'dict_with_convertible_contents': [ 
+                                   ({'a':[[2]],'b':{'c':[3]}}, {'a':np.array([[2]]),'b':{'c':np.array([3])}}),
+                                   ({'a':[[np.array(2)]],'b':{'c':[3]}}, {'a':[[np.array(2)]],'b':{'c':np.array([3])}}) 
+                                  ]
+}
 
-SUM_ARRAYS_CASES = \
-{'empty': [*product(([], {}), (None,))],
-'single_values': [*product(([(3,)], {'a': (3,)}, [[[(3,)]]], {'a':{'a':{'a':(3,)}}}, {'a':[{'a':(3,)}]}), (None,))],
-'working_list': [*product((3*[(3,3)], [(2,2), 2*[(2,2)]], [3*[(2,2)], 2*[(2,2)]]), (None,))],
-'list_broadcasting_error': [*product(([(3,3), (2,1)], [[(2,2), (3,1)], 2*[(2,2)]]), ('broadcast_error',))],
-'working_dict': [*product(({'a': (1,3) , 'b': (3,3)}, {'a': (3,3), 'b':{'c': (3,3)}}), (None,))],
-'dict_broadcasting_error': [*product(({'a': (3,2) , 'b': (3,3)}, {'a': (3,3), 'b':{'c': (3,2)}}), ('broadcast_error',))],
-'working_mixed': [*product(([{'a':(1,3)}, [(3,3)]], {'a':{'c':[(3,3)]}, 'b':[(1,3), (3,3)]}), (None,))],
-'mixed_broadcasting_error': [*product(([{'a':(1,2)}, [(3,3)]], {'a':{'c':[(3,1)]}, 'b':[(1,2), (3,3)]}), ('broadcast_error',))]}
+# RESHAPE_CASES = {
+#     'using_tuple': [ ( [(6,2), (1,12) ], (3,4), None ),
+#                      ({'a': (2,3), 'b': (3,2)}, (3,2), None),
+#                      ({'a': [{'x': (12,)}], 'b': [{'a': (3,4)}]}, (2,6), None),
+#                      ( [(6,2), (1,12) ], (3,4), 'reshape_error'),
+#                      ({'a': [{'x': (13,)}], 'b': [{'a': (3,4)}]}, (2,6), 'reshape_error')
+#                     ],
+#     'using_container': [ ([(6,2), (1,12) ], [(3,4), (12,1)], None),
+#                          ({'a': (2,3), 'b': (3,2)}, {'a':(3,2),'b':(2,3)}, None),
+#                          ({'a': [{'x': (12,)}], 'b': [{'a': (3,2)}]}, {'a': [{'x': (2,6)}], 'b': [{'a': (6,1)}]}, None),
+#                          ({'a': [{'x': (12,), 'y': (2,6)}], 'b':[{'a': (3,2)}]} {'a':(3,4), 'b':(12,1)}, None)
 
-SUM_ELEMENTS_CASES = \
-{'empty': [*product(([], {}), (None,))],
+#     ]
+# }
+
+SUM_ARRAYS_CASES = {
+'empty': [ *product(([], {}), (None,)) ],
+'single_values': [ *product(([(3,)], {'a': (3,)}, [[[(3,)]]], {'a':{'a':{'a':(3,)}}}, {'a':[{'a':(3,)}]}), (None,)) ],
+'working_list': [ *product((3*[(3,3)], [(2,2), 2*[(2,2)]], [3*[(2,2)], 2*[(2,2)]]), (None,)) ],
+'list_broadcasting_error': [ *product(([(3,3), (2,1)], [[(2,2), (3,1)], 2*[(2,2)]]), ('broadcast_error',)) ],
+'working_dict': [ *product(({'a': (1,3) , 'b': (3,3)}, {'a': (3,3), 'b':{'c': (3,3)}}), (None,)) ],
+'dict_broadcasting_error': [ *product(({'a': (3,2) , 'b': (3,3)}, {'a': (3,3), 'b':{'c': (3,2)}}), ('broadcast_error',)) ],
+'working_mixed': [ *product(([{'a':(1,3)}, [(3,3)]], {'a':{'c':[(3,3)]}, 'b':[(1,3), (3,3)]}), (None,)) ],
+'mixed_broadcasting_error': [ *product(([{'a':(1,2)}, [(3,3)]], {'a':{'c':[(3,1)]}, 'b':[(1,2), (3,3)]}), ('broadcast_error',)) ]
+}
+
+SUM_ELEMENTS_CASES = {
+'empty': [*product(([], {}), (None,))],
 'single_vals': [*product(([(3,)], {'a': (3,)}, [[[(3,)]]], {'a':{'a':{'a':(3,)}}}, {'a':[{'a':(3,)}]},
                         {'b':[(2,3), {'c':(3,3)}]}, [{'a':(3,2), 'b':[(1,2), (3,4)]}]), (None,))],
 'list_working': [*product((3*[(3,3)], [(1,3), (3,3)], [[(3,3)], [(3,3)]], [(3,1), [(3,3), (3,3)]], 
@@ -42,26 +73,24 @@ SUM_ELEMENTS_CASES = \
 'mixed_broadcasting_error': [*product(({'b':[(2,3), {'c':(3,3)}],'c':(3,3)}, 
                                     {'a':[(2,3), (3,3)], 'b':[[(3,3)], {'c':(3,3)}]}), ('broadcast_error',))],
 'mixed_key_error': [*product(([{'a':[(3,1), (3,1)]}, {'a':[(3,1)]}], [{'a':[(3,1)]}, {'b':[(3,1)]}], 
-                            {'a':[(3,3), (3,3)], 'b':[{'c':(3,3)}]}, {'a':[(3,3)],'b':{'c':(3,3)}}), ('key_error',))]}
+                            {'a':[(3,3), (3,3)], 'b':[{'c':(3,3)}]}, {'a':[(3,3)],'b':{'c':(3,3)}}), ('key_error',))]
+}
 
 class ArrayMixin:
-    def test_shape_methods(self, std_contents):
-        arraytainer = self.container_class(std_contents)
+    def test_shape_methods(self, std_contents_and_shapes):
 
-        shape_func = lambda array : array.shape
-        expected, _ = apply_func_to_contents(std_contents, func=shape_func)
+        in_contents, shapes = std_contents_and_shapes
+        
+        # in_contents, shapes = deepcopy(in_contents), deepcopy(shapes)
 
-        assert_equal_values(arraytainer.shape, expected)
-        assert_equal_values(arraytainer.shape_container.unpacked, expected)
-        assert_same_types(arraytainer.shape_container, self.container_class(expected))
+        arraytainer = self.container_class(in_contents)
 
-    @pytest.mark.parametrize('contents_in, expected', [val_i for val in ARRAY_CONVERSION.values() for val_i in val], 
-                                                    ids=[key for key, val in ARRAY_CONVERSION.items() for _ in val])
-    def test_array_conversion(self, contents_in, expected):
-        arraytainer = self.container_class(contents_in)
-        assert_equal_values(arraytainer.unpacked, expected)
-        assert_same_types(arraytainer, self.container_class(expected))
-    
+        expected = self.container_class(shapes, greedy_array_conversion=True)
+        result = arraytainer.shape
+
+        assert_equal_values(result.unpacked, expected.unpacked)
+        assert_same_types(expected, result)
+
     def test_array_methods_boolean(self, bool_contents):
 
         arraytainer = self.container_class(bool_contents)
@@ -70,6 +99,15 @@ class ArrayMixin:
 
         assert arraytainer.all() == all([np.all(x) for x in array_list])
         assert arraytainer.any() == any([np.any(x) for x in array_list])
+
+    # def test_reshape_and_flatten():
+    
+    @pytest.mark.parametrize('contents_in, expected', [val_i for val in ARRAY_CONVERSION.values() for val_i in val], 
+                                                    ids=[key for key, val in ARRAY_CONVERSION.items() for _ in val])
+    def test_array_conversion(self, contents_in, expected):
+        arraytainer = self.container_class(contents_in)
+        assert_equal_values(arraytainer.unpacked, expected)
+        assert_same_types(arraytainer, self.container_class(expected))
 
     @pytest.mark.parametrize('contents, exception', [val_i for val in SUM_ELEMENTS_CASES.values() for val_i in val], 
                                                     ids=[key for key, val in SUM_ELEMENTS_CASES.items() for _ in val],
