@@ -1,14 +1,13 @@
 import pytest
 from . import utils 
 
-KEY_CHECKING = \
-{'tuple_of_ints_1': ({(1,2): (1,)}, 'key'),
-'tuple_of_ints_2': ({('1',2):(1,), (1,2):(1,)}, 'key'),
-'valid_key': ({('1',2):(1,), (1,'2'):(1,)}, None)}
-
 class IterableMixin:
-
-    @pytest.mark.parametrize('contents, exception', KEY_CHECKING.values(), ids=KEY_CHECKING.keys())
+    
+    KEY_CHECKING_TEST_CASES = \
+    {'tuple_of_ints_1': ({(1,2): (1,)}, 'key'),
+    'tuple_of_ints_2': ({('1',2):(1,), (1,2):(1,)}, 'key'),
+    'valid_key': ({('1',2):(1,), (1,'2'):(1,)}, None)}
+    @pytest.mark.parametrize('contents, exception', KEY_CHECKING_TEST_CASES.values(), ids=KEY_CHECKING_TEST_CASES.keys())
     def test_key_checking(self, contents, exception):
         if exception is None:
             self.container_class(contents)
