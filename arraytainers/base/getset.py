@@ -17,6 +17,10 @@ class GetterMixin:
     def __getitem__(self, key):
         if self.is_container(key):
             item = self._index_with_container(key)
+        # Interpret indexing with list/dict as a container:
+        elif isinstance(key, (dict,list)):
+            key = self.__class__(key)
+            item = self._index_with_container(key)
         elif self.is_array(key):
             item = self._index_with_array(key)
         elif is_slice(key) or is_tuple_of_ints(key):
@@ -44,12 +48,6 @@ class GetterMixin:
             item[container_key] = self.contents[container_key][slices]
         return item
 
-    @staticmethod
-    def array(in_array):
-        error_msg = ('Base Arraytainer class does not have an array method;', 
-                     'instead, use a Numpytainer or Jaxtainer.')
-        return TypeError(' '.join(error_msg))
-
     def _index_with_hash(self, key):
         try:
             item = self.contents[key]
@@ -72,6 +70,10 @@ class SetterMixin:
     def __setitem__(self, key, new_value):
         if self.is_container(key):
             self._set_with_container(key, new_value)
+        # Interpret indexing with list/dict as a container:
+        elif isinstance(key, (dict,list)):
+            key = self.__class__(key)
+            item = self._set_with_container(key, new_value)
         elif self.is_array(key):
             self._set_with_array(key, new_value)
         elif is_slice(key) or is_tuple_of_ints(key):
@@ -80,6 +82,8 @@ class SetterMixin:
             self._set_with_hash(key, new_value)    
 
     def _set_with_container(self, container, new_value):
+        # If new_value is a dict/list, interpret that as an arraytainer:
+        new_value = self.__class__(new_value) if isinstance(new_value,(dict,list)) else new_value
         for container_key in self.keys():
             idx = container[container_key]
             value_i = new_value[container_key] if self.is_container(new_value) else new_value

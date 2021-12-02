@@ -6,8 +6,11 @@ from main_tests.test_class import ArraytainerTests
 class TestJaxtainer(ArraytainerTests):
     
     container_class = Jaxtainer
-    array = lambda self, x : jnp.array(object=x)
-    array_types = (jaxlib.xla_extension.DeviceArrayBase,)
+    array_constructor = lambda x : jnp.array(object=x)
+    expected_array_types = (jaxlib.xla_extension.DeviceArrayBase,)
+
+    # self.array = lambda self, x : jnp.array(object=x)
+    # self.array_types = (jaxlib.xla_extension.DeviceArrayBase,)
 
     # def test_vmap():
 

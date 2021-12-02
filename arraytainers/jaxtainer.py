@@ -7,17 +7,17 @@ from .base.base import Arraytainer
 class Jaxtainer(Arraytainer):
 
     # May want only floats stored for autograd purposes:    
-    def __init__(self, contents, convert_to_jax=True, floats_only=False, containerise_contents=True):
+    def __init__(self, contents, convert_to_arrays=True, greedy_array_conversion=False, floats_only=False, containerise_contents=True):
 
-        super().__init__(contents)
-        
         self.array_class = (lambda x : jnp.array(x).astype(float)) if floats_only else jnp.array
         self.array_type = jnp.DeviceArray
 
-        if convert_to_jax:
-          self._convert_contents_to_arrays()
+        super().__init__(contents)
+
+        if convert_to_arrays:
+          self._convert_contents_to_arrays(greedy_array_conversion)
         if containerise_contents:
-          self._containerise_contents()
+          self._containerise_contents(convert_to_arrays)
 
     # Over-rided method definitions:
     def _manage_function_call(self, func, types, *args, **kwargs):
@@ -64,9 +64,9 @@ class Jaxtainer(Arraytainer):
     @classmethod
     def tree_unflatten(cls, aux_data, children):
       try:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_to_jax=True, containerise_content=True)
+        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=True, containerise_contents=True)
       except TypeError:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_to_jax=False, containerise_content=False)
+        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=False, containerise_contents=False)
       return unflattened
 
     def _set_array_item(self, container_key, idx, value_i):
