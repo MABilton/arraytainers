@@ -64,9 +64,9 @@ class Jaxtainer(Arraytainer):
     @classmethod
     def tree_unflatten(cls, aux_data, children):
       try:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=True, containerise_content=True)
+        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=True, containerise_contents=True)
       except TypeError:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=False, containerise_content=False)
+        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=False, containerise_contents=False)
       return unflattened
 
     def _set_array_item(self, container_key, idx, value_i):

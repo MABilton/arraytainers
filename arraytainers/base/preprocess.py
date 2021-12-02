@@ -54,7 +54,6 @@ class Mixin:
       
       # If val is a Jax array in a Numpytainer or a Numpy array in a Jaxtainer:
       elif self.is_array(val):
-        print_flag=True
         contents[key] = self.array(val)
         can_convert[key] = False
       

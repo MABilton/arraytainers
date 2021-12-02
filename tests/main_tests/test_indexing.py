@@ -1,119 +1,146 @@
 import pytest
 import numpy as np
-
-from .utils import apply_func_to_contents, assert_equal_values, assert_same_types, create_idx_combos
-
-INDEX_HASH = \
-{'simple_dict': create_idx_combos({'a':(2,3),'b':(2,1)}, [('a',None),(0,'key_error'),(-1,'key_error'),('c','key_error')]),
-    'simple_list': create_idx_combos([(2,3),(2,1)], [('a','key_error'),(0,None),(-1,None),(3,'key_error')]),
-    'nested_list': create_idx_combos([[(2,3),(2,3),(2,3)],(2,1)], [(0,None),(1,None),(2,'key_error')]),
-    'nested_dict': create_idx_combos({'a':(2,1),'b':{'c':(2,2),'d':(2,1)},'c':(1,1)}, 
-                                    [('a',None),('b',None),('c',None),('d','key_error')]),
-    'mixed': create_idx_combos({'a':[(1,2),(2,3),{'c':(3,2)}], 'b':{'c':[(2,1), (2,2)]}}, 
-                            [('a',None),('b',None),(0,'key_error'),('c','key_error')])}
-
-INDEX_SLICE = \
-{'simple_dict': create_idx_combos({'a':(6,),'b':(7,)}, [(slice(1),None), (slice(1,5),None),(slice(1,10,2),None),
-                                    ((slice(1,5,2), slice(1,5,2)),'key_error')]),
-    'simple_list': create_idx_combos([(3,3),(2,2)], [(slice(1),None), (slice(0,2),None), ((slice(0),slice(0,2)),None)]),
-    'nested_list': create_idx_combos([[(2,2,2), (2,)],(2,1)], [(slice(0,2), None), ((slice(0,0),slice(0,0)),'key_error')]),
-    'nested_dict': create_idx_combos({'a':(2,1),'b':{'c':(2,2),'d':(2,)},'c':(1,1)}, 
-                                    [(slice(0,2), None), ((slice(0,0),slice(0,0)),'key_error')]),
-    'mixed': create_idx_combos({'a':[(1,2),(3,),{'c':(3,2)}], 'b':{'c':[(2,1), (2,2)]}}, 
-                            [(slice(0,2), None), ((slice(0,0),slice(0,0)),'key_error')])}
-
-INDEX_ARRAY = \
-{'simple_dict': create_idx_combos({'a':(3,),'b':(3,)}, [([0,-1],None), ([],'key_error'),
-                                    ([5],'key_error'), (np.array([True, False, True]),None), 
-                                    ([True, False],'key_error'), ([[True, False], [False, True]],'key_error')]),
-    'simple_list': create_idx_combos([(3,3),(2,2)], [([0,-1],None), ([[0,-1],[0,-1]],None),
-                                        ([[10,0],[0,-2]],'key_error'), ([[True,False],[True,False]],'key_error')])} #,
-#  'nested_list': create_array_combos([[(2,2,2), (2,)],(2,1)], [(np.array([0,1]), None), 
-#                                     ((np.array([0,1]),np.array([0,1])),'key_error')]),
-#  'nested_dict': create_array_combos({'a':(2,1),'b':{'c':(2,2),'d':(2,)},'c':(1,1)}, 
-#                                     [(np.array([0,1]), None), ((np.array([0,1]),np.array([0,1])),'key_error')]),
-#  'mixed': create_array_combos({'a':[(1,2),(3,),{'c':(3,2)}], 'b':{'c':[(2,1), (2,2)]}}, 
-#                               [(np.array([0,1]), None), ((np.array([0,1]),np.array([0,1])),'key_error')])}
+from . import utils 
+from .utils import cartesian_prod
 
 class IndexMixin:
     
-    @pytest.mark.parametrize('contents, key, exception', [val_i for val in INDEX_HASH.values() for val_i in val], 
-                                                         ids=[key for key, val in INDEX_HASH.items() for _ in val],
+    HASH_INDEXING_TEST_CASES = \
+    {'simple_dict': cartesian_prod( {'a':(2,3),'b':(2,1)}, ( ('a',None), (0,'key_error'), (-1,'key_error'), ('c','key_error') ) ),
+     'simple_list': cartesian_prod( [(2,3),(2,1)], ( ('a','key_error'), (0,None), (-1,None), (2,'key_error') ) ),
+     'nested_list': cartesian_prod( [[(2,3),(2,3),(2,3)],(2,1)], ( (0,None), (1,None), (2,'key_error') ) ),
+     'nested_dict': cartesian_prod( {'a':(2,1),'b':{'c':(2,2),'d':(2,1)},'c':(1,1)} , 
+                                        ( ('a',None), ('b',None), ('c',None), ('d','key_error') )),
+     'mixed': cartesian_prod( {'a':[(1,2),(2,3),{'c':(3,2)}],'b':{'c':[(2,1), (2,2)]}}, 
+                                        ( ('a',None), ('b',None), (0,'key_error'), ('c','key_error') ) )
+    }
+    @pytest.mark.parametrize('contents, key, exception', utils.unpack_test_cases(HASH_INDEXING_TEST_CASES), 
+                                                         ids=utils.unpack_test_ids(HASH_INDEXING_TEST_CASES),
                                                          indirect=['contents'])
     def test_indexing_with_hash(self, contents, key, exception):
-        
+
         arraytainer = self.container_class(contents)
 
         if exception is None:
             result = arraytainer[key]
             expected = contents[key]
             if isinstance(result, self.container_class):
-                assert_equal_values(result.unpacked, expected)
-                assert_same_types(result, self.container_class(expected))
+                utils.assert_equal_values(result.unpacked, expected)
+                utils.assert_same_types(result, self.container_class(expected))
             else:
-                assert_equal_values(result, expected)
+                utils.assert_equal_values(result, expected)
         else:
             self.assert_exception(lambda x, key: x[key], exception, arraytainer, key)
 
-    @pytest.mark.parametrize('contents, slice_val, exception', [val_i for val in INDEX_SLICE.values() for val_i in val], 
-                                                               ids=[key for key, val in INDEX_SLICE.items() for _ in val],
-                                                               indirect=['contents'])
+    SLICE_INDEXING_TEST_CASES = \
+    {'simple_dict': cartesian_prod( {'a':(6,),'b':(7,)}, ( (slice(1),None), (slice(1,5),None), (slice(1,10,2),None), 
+                                                            ((slice(1,5,2), slice(1,5,2)),'key_error') ) ),
+     'simple_list': cartesian_prod( [(3,3),(2,2)], ( (slice(1),None), (slice(0,2),None), ((slice(0),slice(0,2)),None) ) ),
+     'nested_list': cartesian_prod( [[(2,2,2),(2,)],(2,1)], ( (slice(0,2),None), ((slice(0,0),slice(0,0)),'key_error') ) ),
+     'nested_dict': cartesian_prod( {'a':(2,1),'b':{'c':(2,2),'d':(2,)},'c':(1,1)}, 
+                                            ( (slice(0,2), None), ((slice(0,0),slice(0,0)),'key_error') ) ),
+     'mixed': cartesian_prod( {'a':[(1,2),(3,),{'c':(3,2)}],'b':{'c':[(2,1),(2,2)]}}, 
+                                            ( (slice(0,2),None), ((slice(0,0),slice(0,0)),'key_error') ) )
+    }
+    @pytest.mark.parametrize('contents, slice_val, exception', utils.unpack_test_cases(SLICE_INDEXING_TEST_CASES),
+                                                              ids=utils.unpack_test_ids(SLICE_INDEXING_TEST_CASES),
+                                                              indirect=['contents'])
     def test_indexing_with_slice(self, contents, slice_val, exception):
-        
+
         arraytainer = self.container_class(contents)
         index_func = lambda contents : contents[slice_val]
 
         if exception is None:
             result = arraytainer[slice_val]
-            expected, _ = apply_func_to_contents(contents, func=index_func)
-            assert_equal_values(result.unpacked, expected)
-            assert_same_types(result, self.container_class(expected))
+            expected, _ = utils.apply_func_to_contents(contents, func=index_func, throw_exception=True)
+            utils.assert_equal_values(result.unpacked, expected)
+            utils.assert_same_types(result, self.container_class(expected))
         else:
             self.assert_exception(lambda x, key: x[key], exception, arraytainer, slice_val)
 
-    # @pytest.mark.parametrize('contents, array_vals, exception', 
-    #                          [val_i for val in INDEX_ARRAY.values() for val_i in val], 
-    #                          ids=[key for key, val in INDEX_ARRAY.items() for _ in val],
-    #                          indirect=['contents'])
-    # def test_indexing_with_array(self, contents, array_vals, exception):
+    ARRAY_INDEX = ( ([0,-1],None), ([0,0,0],None), ([[0,-1,0],[-1,0,-1]],None),
+                    ([True,False], None), ([[True,False],[False,True]], None),
+                    ([[True],[False]], 'key_error') )
+    INDEX_ARRAY_TEST_CASES = \
+    {'dict': cartesian_prod( {'a':(2,2),'b':(2,2)}, ARRAY_INDEX ),
+     'list': cartesian_prod( [(2,2),(2,2)], ARRAY_INDEX ),
+     'nested_list': cartesian_prod( [[[(2,2)]],[(2,2),(2,2)]], ARRAY_INDEX ),
+     'nested_dict': cartesian_prod( {'a':{'c':{'a':(2,2)},'d':(2,2)},'b':{'b':(2,2),'c':(2,2)}}, ARRAY_INDEX ),
+     'mixed_a': cartesian_prod( [{'a':[(2,2),(2,2)],'c':(2,2)},{'b':(2,2),'c':{'d':(2,2)}}], ARRAY_INDEX ),
+     'mixed_b': cartesian_prod( {'a':[(2,2),{'c':(2,2)}], 'b':[[(2,2),(2,2)],(2,2)]}, ARRAY_INDEX )
+    }
+    @pytest.mark.parametrize('contents, array, exception', utils.unpack_test_cases(INDEX_ARRAY_TEST_CASES), 
+                                                           ids=utils.unpack_test_ids(INDEX_ARRAY_TEST_CASES),
+                                                           indirect=['contents', 'array'])
+    def test_indexing_with_array(self, contents, array, exception):
+        arraytainer = self.container_class(contents)
+        index_func = lambda contents : contents[array]
+        if exception is None:
+            expected, _ = utils.apply_func_to_contents(contents, func=index_func, throw_exception=True)
+            result = arraytainer[array]
+            utils.assert_equal_values(result.unpacked, expected)
+            utils.assert_same_types(result, self.container_class(expected))
+        else:
+            self.assert_exception(index_func, exception, arraytainer)
 
-    #     arraytainer = self.container_class(contents)
-    #     array_key = self.array(array_vals)
+    # We directly create arrays here with np.array to correctly speciy array shapes in content indices:
+    INDEX_CONTENTS_TEST_CASES = \
+    {'dict': cartesian_prod({'a':(2,2),'b':(3,3)}, ( ( {'a':[0,-1,-1],'b':[0,0]}, None ),
+                                                    ( {'a':np.array([True,False]),'b':np.array([True,False,True])}, None ),
+                                                    ( {'a':np.array(2*[[True,False]]),'b':np.array(3*[[True,False,True]])}, None ),
+                                                    ( {'a':np.array([[True,False]]),'b':np.array([True,False,True])}, 'key_error' ),
+                                                ( {'a':{'c':np.array([[True,False]])},'b':np.array([True,False,True])}, 'key_error' )  ) ),
+     'list': cartesian_prod([(2,2),(3,3)], ( ( [np.array([0,-1,-1]),np.array([0,0])], None ),
+                                             ( [np.array([True,False]),np.array([True,False,True])], None ),
+                                             ( [np.array(2*[[True,False]]),np.array(3*[[True,False,True]])], None ),
+                                             ( [np.array([[True,False]]),np.array([True,False,True])], 'key_error' ) ) ),  
+     'nested_dict': cartesian_prod({'a':{'c':(2,2),'e':{'d':(2,2)}},'b':{'b':(3,3),'e':(3,3)}}, 
+                                   ( ( {'a':np.array([0,-1,-1]),'b':np.array([0,0])}, None ),
+                                     ( {'a':np.array(2*[[True,False]]),'b':np.array(3*[[True,False,True]])}, None ),
+                                     ( {'a':np.array(2*[[True,False]]),'b':np.array(3*[[True,False,True]])}, None ),
+                    ( {'a':{'c':np.array(2*[[True,False]]),'e':np.array(2*[[False,True]])},'b':np.array(3*[[True,False,True]])}, None ),
+                    ( {'a':{'c':np.array(2*[[True,False]]),'e':np.array(2*[[False,True]])},
+                       'b':{'b':np.array(3*[[True,False,True]]),'e':np.array([True,False,True])}}, None ) ) ),
+     'mixed': cartesian_prod( {'a':[{'c':(2,2)},[(2,2),(2,2)],(2,2)],'b':[(3,3),{'c':(3,3),'d':(3,3)}]}, 
+                              ( ( {'a':np.array([False,True]),'b':np.array([True,False,True])}, None ),
+                                ( {'a':np.array([[False,True],[True,False]]), 
+                                  'b':[np.array([True,False,True]),np.array([True,True,False])]}, None ),
+                                ( {'a':np.array([[False,True],[True,True]]), 
+                                  'b':[np.array([True,False,True]), {'c': np.array([True,False,False]), 
+                                  'd': np.array([True,False,True])}]}, None ),
+                                ({'a':[np.array([False,True])],'b':np.array([True,False,True])}, 'key_error') ) )
+    }
+    @pytest.mark.parametrize('contents, index_contents, exception', utils.unpack_test_cases(INDEX_CONTENTS_TEST_CASES), 
+                                                                    ids=utils.unpack_test_ids(INDEX_CONTENTS_TEST_CASES),
+                                                                    indirect=['contents'])
+    def test_indexing_with_arraytainer(self, contents, index_contents, exception):
 
-    #     # There are errors when trying to index a Numpy array with a Jax array
-    #     # and vice versa - need to make sure that Arraytainers can handle these
-    #     # cases properly:
-    #     def index_func(in_contents, array_key):
-    #         try:
-    #             indexed = in_contents[array_key]
-    #         except:
-    #             indexed = in_contents[self.array(array_key)]
-    #         return indexed 
+        arraytainer = self.container_class(contents)
+        index_arraytainer = self.container_class(index_contents)
 
-    #     # # Strangely, indexing Jax arrays with Jax arrays which have out-of-bounds indices does
-    #     # # NOT throw an exception - this is meant to be 'normal behaviour:
-    #     # if isinstance(array_class(1), jnp.DeviceArray) and ('jax' in self.container_class.__name__.lower()):
-    #     #     # In case of indexing Jax array with another Jax array, we'll work out what the error is
-    #     #     # supposed to be:
-    #     #     expected, exception = apply_func_to_contents(contents, func=index_func, args=(array_key,))
+        # For case of Jaxtainer, check that index contents correctly converted to Jax arrays:
+        if 'jax' in self.container_class.__name__.lower():
+            array_list = utils.get_list_of_arrays(index_arraytainer.unpacked)
+            assert all([isinstance(x,self.expected_array_types) for x in array_list])
+            # If passed assertion, replace index_contents with unpacked arraytainer (since this will
+            # contain Jax arrays instead of Numpy arrays):
+            index_contents = index_arraytainer.unpacked
 
-    #     if exception is None:
-    #         result = arraytainer[array_key]
-    #         expected, _ = apply_func_to_contents(contents, func=index_func, args=(array_key,))
-    #         assert_equal_values(result.unpacked, expected)
-    #         assert_same_types(result, self.container_class(expected))
-    #     else:
-    #         self.assert_exception(lambda x, key: x[key], exception, arraytainer, array_key)
+        index_func = lambda x, idx : x[idx]
 
-
-
-    # def test_indexing_with_arraytainer(self, arraytainers_contents_keys):
-        
-    #     arraytainer = self.container_class(contents)
-    #     arraytainer_key = self.container_class(key_contents)
-        
-    #     index_func = lambda contents, idx : contents[idx][key_contents[idx]]
-    #     expected, exception = apply_func_to_contents(contents, func=index_func)
-        
-    #     with exception:
-    #         assert arraytainer[arraytainer_key] == self.container_class(expected)
+        if exception is None:
+            
+            index_args_fun = lambda args, idx : (args[0][idx],) if not utils.is_array(args[0]) else args
+            expected, _ =  utils.apply_func_to_contents(contents, func=index_func, args=(index_contents,), 
+                                                        index_args_fun=index_args_fun, throw_exception=True)
+            # First try indexing with contents NOT converted to arraytainer - should work same as arraytainer:
+            result_1 = arraytainer[index_contents]
+            utils.assert_equal_values(expected, result_1.unpacked)
+            utils.assert_same_types(self.container_class(expected), result_1)
+            # Next try indexing with arraytainer version of contents:
+            result_2 = arraytainer[index_arraytainer]
+            utils.assert_equal_values(expected, result_2.unpacked)
+            utils.assert_same_types(self.container_class(expected), result_2)
+        else:
+            self.assert_exception(index_func, exception, arraytainer, index_contents)
+            self.assert_exception(index_func, exception, arraytainer, index_arraytainer)

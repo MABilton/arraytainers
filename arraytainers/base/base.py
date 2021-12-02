@@ -25,7 +25,9 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
 
     def __init__(self, contents):
 
-        if not hasattr(contents, '__len__'):
+        if self.is_array(contents):
+            contents = [contents]
+        elif not hasattr(contents, '__len__'):
             contents = [contents]
         elif isinstance(contents, tuple):
             contents = list(contents)

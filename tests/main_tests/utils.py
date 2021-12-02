@@ -1,22 +1,74 @@
-
 import numpy as np
 import jax.numpy as jnp
 import jaxlib
-from arraytainers import Numpytainer, Jaxtainer
-
+from copy import deepcopy
 from itertools import product
+from more_itertools import always_iterable
+from arraytainers import Numpytainer, Jaxtainer
 
 ARRAYTAINER_TYPES = (Numpytainer, Jaxtainer)
 ARRAY_TYPES = (np.ndarray, jnp.DeviceArray, jaxlib.xla_extension.DeviceArray)
+ARRAY_CONSTRUCTORS = (np.array, jnp.array)
 NONARRAY_TYPES = (dict, list, tuple)
 NUM_TYPES = (np.float32, np.float64)
 
+# Helper functions:
+def create_contents(shapes, array_constructor, single_value=None, return_bool=False, seed=42):
+    shapes = deepcopy(shapes)
+    np.random.seed(seed)
+    in_contents = create_contents_recursion(shapes, array_constructor, single_value, return_bool)
+    return in_contents
+
+def create_contents_recursion(shapes, array_constructor, single_value, return_bool):
+
+    if isinstance(shapes, dict):
+        return {key: create_contents_recursion(val, array_constructor, single_value, return_bool) for key, val in shapes.items()}
+
+    elif isinstance(shapes, list):
+        return [create_contents_recursion(val, array_constructor, single_value, return_bool) for val in shapes]
+
+    elif isinstance(shapes, tuple):
+        if single_value is not None:
+            array = single_value*np.ones(shapes)
+            array = array.astype(bool) if return_bool else array
+        else:
+            array = np.random.rand(*shapes)
+            array = array>0.5 if return_bool else 10*array
+        return array_constructor(array)
+
+# Functions to identify arrays and arraytainers:
+def is_array(x):
+    return isinstance(x, ARRAY_TYPES)
+
+def is_arraytainer(x):
+    return isinstance(x, ARRAYTAINER_TYPES)
+
+# Funtion to create parameter combinations for test cases:
+def cartesian_prod(*vals, flatten=True):
+    input_vals = [val if isinstance(val,tuple) else (val,) for val in vals]
+    prod = list(product(*input_vals))
+    prod = [flatten_tuple(item) for item in prod] if flatten else prod
+    return tuple(prod)
+
+def flatten_tuple(input):
+  flattened = []
+  for vals in input:
+    flattened += [val_i for val_i in vals] if isinstance(vals, tuple) else [vals]
+  return flattened
+
+def group_first_n_params(test_dict, n):
+    return {key : [((*val[0:n],), *val[n:]) for val in cases] for key, cases in test_dict.items()}
+
+# Helper functions to unpack parameter combos to paramterised test functions:
+def unpack_test_cases(test_cases):
+    return tuple([val_i for val in test_cases.values() for val_i in val])
+
+def unpack_test_ids(test_cases):
+    return tuple([key for key, val in test_cases.items() for _ in val])
+
+# Helperfunction to get keys from dict or list/tuple:
 def get_keys(contents):
     return contents.keys() if isinstance(contents, dict) else range(len(contents))
-
-# Helper function to create test values:
-def create_idx_combos(contents, key_error_tuples):
-    return [(contents, key, error) for contents, (key, error) in product((contents,), key_error_tuples)]
 
 # Functions to assert that sets of unpacked contents are equal in typing at each level:
 def assert_same_types(arraytainer_1, arraytainer_2, container_class=None, check_args=True):
@@ -69,7 +121,6 @@ def assert_equal_values(contents_1, contents_2, approx_equal=True):
       # Must specify no key broadcasting - we want this to throw an error if we don't have matching sets of keys:
       apply_func_to_contents(contents_1, contents_2, key_broadcasting=False, func=assert_func, throw_exception=True)
   except Exception as e:
-      print(e)
       raise Exception(f'Values {contents_1} and {contents_2} not equal.')
 
 # Function to apply a function to a list of contents:
@@ -159,3 +210,35 @@ def call_func_recursive(content_list, func, args, kwargs, index_args_fun, key_br
             return result
     else:
         return func(*content_list, *args, **kwargs)
+
+# Array method utilities:
+def sum_elements(contents):
+
+    content_list = contents.values() if isinstance(contents,dict) else contents    
+    array_elems, nonarray_elems = [], []
+    for val in content_list:
+        array_elems.append(val) if is_array(val) else nonarray_elems.append(val)
+    
+    if not nonarray_elems:
+        sum_result = sum(array_elems)
+    else:
+        first_elem = nonarray_elems[0]
+        elem_keys = get_keys(first_elem)
+        sum_result = {key: sum_elements([val[key] for val in nonarray_elems] + array_elems) 
+                     for key in elem_keys}
+        if isinstance(first_elem, list):
+            sum_result = list(sum_result.values())
+    return sum_result
+
+def get_list_of_arrays(contents, array_list=None):
+
+    array_list = [] if array_list is None else array_list
+    keys = get_keys(contents)
+
+    for key in keys:
+        if isinstance(contents[key], (dict, list)):
+            array_list = get_list_of_arrays(contents[key], array_list)
+        else:
+            array_list.append(contents[key])
+    
+    return array_list
