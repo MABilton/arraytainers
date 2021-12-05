@@ -2,9 +2,21 @@ from copy import deepcopy
 
 class Mixin:
     # Applies a (potentially custom) functon to each value in array:
-    def apply(self, func, *args, **kwargs):
-        func_return = {key: func(val, *args, **kwargs) if not self.is_container(val) else val.apply(func, *args, **kwargs) 
-                       for key, val in self.items()} 
+    def apply(self, func, skip_level=0, broadcast=True, args=(), kwargs=None):
+        kwargs = {} if kwargs is None else kwargs
+        func_return = {}
+        for key, val in self.items():
+            if skip_level==0:
+                if broadcast:
+                    args_i = [arg_i[key] if self.is_container(arg_i) else arg_i for arg_i in args]
+                    kwargs_i = {key_i: arg_i[key] if self.is_container(arg_i) else arg_i for key_i, arg_i in kwargs.keys()}
+                else:
+                    args_i, kwargs_i = args, kwargs
+                func_return[key] = func(val, *args_i, **kwargs_i) if not self.is_container(val) \
+                                   else val.apply(func, skip_level=skip_level, broadcast=broadcast, args=args_i, kwargs=kwargs_i) 
+            else:
+                func_return[key] = val.apply(func, skip_level=skip_level-1, broadcast=broadcast, args=args, kwargs=kwargs) 
+                
         func_return = list(func_return.values()) if self._type is list else func_return
         return self.__class__(func_return)
 

@@ -21,6 +21,9 @@ class FunctionMixin:
         else:
             self.assert_exception(func, exception, *arraytainer_list)
 
+    # def test_apply_method(self, contents, func, args, kwargs):
+    #     pass
+
     NP_FUNC_TEST_CASES = {'exp': np.exp, 'cos': np.cos, 'floor': np.floor, 'log': np.log}
     @pytest.mark.parametrize('np_func', NP_FUNC_TEST_CASES.values(), ids=NP_FUNC_TEST_CASES.keys())
     def test_np_func(self, std_contents, np_func):
