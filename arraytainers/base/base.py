@@ -34,7 +34,7 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
             contents = list(contents)
 
         # Need to be careful when copying Jax arrays - this actually returns a Numpy array:
-        self.contents = recursive_copy(contents)
+        self.contents = deepcopy(contents)
         self._type = dict if hasattr(self.contents, 'keys') else list
         self.check_keys()
 
