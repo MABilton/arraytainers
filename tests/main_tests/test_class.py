@@ -5,8 +5,9 @@ from .test_array_methods import ArrayMixin
 from .test_functions import FunctionMixin
 from .test_indexing import IndexMixin
 from .test_iterables import IterableMixin
+from .test_setting import SetMixin
 
-class ArraytainerTests(ArrayMixin, FunctionMixin, IndexMixin, IterableMixin): 
+class ArraytainerTests(ArrayMixin, FunctionMixin, IndexMixin, IterableMixin, SetMixin): 
 
     # Attributes which have different values for Jax and Numpy testing classes:
     container_class = None

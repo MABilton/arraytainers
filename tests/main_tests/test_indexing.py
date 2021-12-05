@@ -4,7 +4,35 @@ from . import utils
 from .utils import cartesian_prod
 
 class IndexMixin:
-    
+    GET_TEST_CASES = \
+    {'list': cartesian_prod( [[(2,1),[(2,),(1,)]],[(2,2),[(2,),(1,)]]], 
+                                ( ((0,), None), ((0,1), None) , ((0,1,0), None), ((1,1,1), None),
+                                  ((2,), 'key_error'), ((0,0,0), AttributeError), ((1,1,2), 'key_error'), ((),'key_error') ) ),
+     'dict': cartesian_prod( {'a':{'c':{1:(1,2)},0:(2,2)},'b':{'a':(3,2),'b':{('a','b'):(2,1)}}},
+                                ( (('a',), None), (('a','c',1), None), (('b','b'), None),
+                                  (('a',0), None), (('a','c','b'), 'key_error'), ((0,'c','b'), 'key_error'),
+                                  (('b','b',('a','b')), None), (('b','a','b'), AttributeError) , ((),'key_error') ) ),
+     'mixed': cartesian_prod( {'a':[(1,2),{1:(2,2),('a','b'):(2,3)},(2,2)],1:{'c':[(2,1),(1,2)],'d':(2,1)}},
+                                 ( (('a',), None), (('a',1),None), (('a',1,1),None), (('a',1,('a','b')),None), ((1,),None), 
+                                   ((1,'c'),None), ((1,'c',0),None), (('a',1,2),'key_error'), ((1,'c',2),'key_error'), 
+                                   ((),'key_error') ) ) 
+    }
+    @pytest.mark.parametrize('contents, key_iterable, exception', utils.unpack_test_cases(GET_TEST_CASES), 
+                                                                  ids=utils.unpack_test_ids(GET_TEST_CASES),
+                                                                  indirect=['contents'])
+    def test_get_method(self, contents, key_iterable, exception):
+        arraytainer = self.container_class(contents)
+
+        if exception is None:
+            result = arraytainer.get(*key_iterable)
+            expected = utils.get_contents_item(contents, key_iterable)
+            result_val_check = result.unpacked if utils.is_arraytainer(result) else result
+            utils.assert_equal_values(result_val_check, expected)
+            result_type_check = result if utils.is_arraytainer(result) else self.container_class(result)
+            utils.assert_same_types(result_type_check, self.container_class(expected))
+        else:
+            self.assert_exception(lambda x, key_iterable: x.get(*key_iterable), exception, arraytainer, key_iterable)
+
     HASH_INDEXING_TEST_CASES = \
     {'simple_dict': cartesian_prod( {'a':(2,3),'b':(2,1)}, ( ('a',None), (0,'key_error'), (-1,'key_error'), ('c','key_error') ) ),
      'simple_list': cartesian_prod( [(2,3),(2,1)], ( ('a','key_error'), (0,None), (-1,None), (2,'key_error') ) ),

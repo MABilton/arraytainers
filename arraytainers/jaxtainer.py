@@ -7,7 +7,7 @@ from .base.base import Arraytainer
 class Jaxtainer(Arraytainer):
 
     # May want only floats stored for autograd purposes:    
-    def __init__(self, contents, convert_to_arrays=True, greedy_array_conversion=False, floats_only=False, containerise_contents=True):
+    def __init__(self, contents, convert_to_arrays=True, greedy_array_conversion=False, floats_only=False, _containerise_contents=True):
 
         self.array_class = (lambda x : jnp.array(x).astype(float)) if floats_only else jnp.array
         self.array_type = jnp.DeviceArray
@@ -16,7 +16,7 @@ class Jaxtainer(Arraytainer):
 
         if convert_to_arrays:
           self._convert_contents_to_arrays(greedy_array_conversion)
-        if containerise_contents:
+        if _containerise_contents:
           self._containerise_contents(convert_to_arrays)
 
     # Over-rided method definitions:
@@ -60,17 +60,17 @@ class Jaxtainer(Arraytainer):
     # Functions required by @register_pytree_node_class decorator:
     def tree_flatten(self):
       return tree_flatten(self.unpacked)
-    
+
     @classmethod
     def tree_unflatten(cls, aux_data, children):
       try:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=True, containerise_contents=True)
+        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=True, _containerise_contents=True)
       except TypeError:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=False, containerise_contents=False)
+        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=False, _containerise_contents=False)
       return unflattened
-
-    def _set_array_item(self, container_key, idx, value_i):
-      self.contents[container_key] = self.contents[container_key].at[idx].set(value_i)
+    
+    def _set_array_item(self, key, idx, value):
+      self.contents[key] = self.contents[key].at[idx].set(value)
 
 def find_method(module, func, submodule_to_search=('', 'linalg', 'fft')):
     method_name = str(func.__name__)

@@ -12,7 +12,22 @@ ARRAY_CONSTRUCTORS = (np.array, jnp.array)
 NONARRAY_TYPES = (dict, list, tuple)
 NUM_TYPES = (np.float32, np.float64)
 
-# Helper functions:
+def set_contents_item(contents, key_iterable, new_val):
+    key_iterable = list(key_iterable)
+    key_i = key_iterable.pop(0)
+    if key_iterable:
+        set_contents_item(contents[key_i], key_iterable, new_val)
+    else:
+        contents[key_i] = new_val
+
+def get_contents_item(contents, key_iterable):
+    key_iterable = list(key_iterable)
+    key_i = key_iterable.pop(0)
+    if key_iterable:
+        return get_contents_item(contents[key_i], key_iterable)
+    else:
+        return contents[key_i]
+
 def create_contents(shapes, array_constructor, single_value=None, return_bool=False, seed=42):
     shapes = deepcopy(shapes)
     np.random.seed(seed)

@@ -6,8 +6,11 @@ from main_tests.test_class import ArraytainerTests
 class TestJaxtainer(ArraytainerTests):
     
     container_class = Jaxtainer
-    array_constructor = lambda x : jnp.array(object=x)
     expected_array_types = (jaxlib.xla_extension.DeviceArrayBase,)
+
+    @staticmethod
+    def array_constructor(x):
+        return jnp.array(object=x)
 
     # self.array = lambda self, x : jnp.array(object=x)
     # self.array_types = (jaxlib.xla_extension.DeviceArrayBase,)
