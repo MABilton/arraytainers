@@ -1,6 +1,12 @@
 from copy import deepcopy
 
 class Mixin:
+    # Applies a (potentially custom) functon to each value in array:
+    def apply(self, func, *args, **kwargs):
+        func_return = {key: func(val, *args, **kwargs) if not self.is_container(val) else val.apply(func, *args, **kwargs) 
+                       for key, val in self.items()} 
+        func_return = list(func_return.values()) if self._type is list else func_return
+        return self.__class__(func_return)
 
     # Functions which deal with Numpy functions and universal operators:
     def __array_function__(self, func, types, args, kwargs):
