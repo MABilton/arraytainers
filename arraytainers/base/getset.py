@@ -9,10 +9,21 @@ def is_tuple_of_ints(key):
 
 class GetterMixin:
     
+    def __iter__(self):
+        return ()
+
     def check_keys(self):
         invalid_keys = [str(key) for key in self.keys() if is_tuple_of_ints(key)]
         if invalid_keys:
             raise KeyError(f'Cannot use {", ".join(invalid_keys)}, tuple(s) of ints, as key(s) in an Arraytainer.')
+
+    def get(self, *key_iterable):
+        key_iterable = list(key_iterable)
+        key_i = key_iterable.pop(0)
+        if key_iterable:
+            return self[key_i].get(*key_iterable)
+        else:
+            return self.contents[key_i]
 
     def __getitem__(self, key):
         if self.is_container(key):
@@ -57,15 +68,40 @@ class GetterMixin:
             raise KeyError(' '.join(error_msg))
         return item
 
+def _attempt_append(contents, new_val):
+    try:
+        contents.append(new_val)
+    except AttributeError:
+        error_msg = ('Unable to append values to dictionary-like container;',
+                    "use 'my_arraytainer[new_key] = new_value' or the my_arraytainer.set method instead.")
+        raise AttributeError(' '.join(error_msg))
+
 class SetterMixin:
     
-    def append(self, new_val):
-        try:
-            self.contents.append(new_val)
-        except AttributeError:
-            error_msg = ('Unable to append values to dictionary-like container;',
-                         "use the syntax 'Arraytainer[new_key] = new_value' instead.")
-            raise AttributeError(' '.join(error_msg))
+    def append(self, new_val, key_iterable=()):
+        if key_iterable:
+            key_iterable = list(key_iterable)
+            key_i = key_iterable.pop(0)
+            if key_iterable:
+                self[key_i].append(new_val, key_iterable)
+            else:
+                _attempt_append(self.contents[key_i], new_val)
+        else:
+            _attempt_append(self.contents, new_val) 
+
+    def set(self, new_val, *key_iterable):
+        key_iterable = list(key_iterable)
+        key_i = key_iterable.pop(0)
+        if key_iterable:
+            self[key_i].set(new_val, *key_iterable)
+        else:
+            try:
+                new_val = self.__class__(new_val) if not self.is_array(new_val) else new_val
+                self.contents[key_i] = new_val
+            except AttributeError:
+                error_msg = ("Unable to new assign items to a list-like container;",
+                             "use the append method instead.")
+                raise AttributeError(' '.join(error_msg))
 
     def __setitem__(self, key, new_value):
         if self.is_container(key):
@@ -81,13 +117,16 @@ class SetterMixin:
         else:
             self._set_with_hash(key, new_value)    
 
-    def _set_with_container(self, container, new_value):
+    def _set_with_container(self, container_key, new_value):
         # If new_value is a dict/list, interpret that as an arraytainer:
-        new_value = self.__class__(new_value) if isinstance(new_value,(dict,list)) else new_value
-        for container_key in self.keys():
-            idx = container[container_key]
-            value_i = new_value[container_key] if self.is_container(new_value) else new_value
-            self._set_array_item(container_key, idx, value_i)
+        new_value = self.__class__(new_value) if isinstance(new_value, (dict,list,tuple)) else new_value
+        for key in self.keys():
+            value_i = new_value[key] if self.is_container(new_value) else new_value
+            idx_i = container_key[key]
+            if self.is_array(self[key]):
+                self._set_array_item(key, idx_i, value_i)
+            else:
+                self[key][idx_i] = value_i
 
     def _set_with_array(self, array_key, new_value):
         for container_key in self.keys():
@@ -105,11 +144,15 @@ class SetterMixin:
         return KeyError(' '.join(error_msg))
 
     def _set_with_hash(self, key, new_value):
+        
+        if not self.is_container(new_value):
+            new_value = self.__class__(new_value)
+
         try:
             self.contents[key] = new_value
         except IndexError:
             if self._type is list:
-                error_msg = ("Unable to assign items to a list-like container;",
+                error_msg = ("Unable to new assign items to a list-like container;",
                              "use the append method instead.")
                 raise TypeError(' '.join(error_msg))
             else:

@@ -48,6 +48,21 @@ class ArrayMixin:
         assert arraytainer.all() == all([np.all(x) for x in array_list])
         assert arraytainer.any() == any([np.any(x) for x in array_list])
 
+    INCREMENT_FUNCS = {'addition': lambda x,y: operator.iadd(x,y), # Equivalent to x += y
+                       'subtraction': lambda x,y: operator.isub(x,y), # Equivalent to x -= y
+                       'multiplication': lambda x,y: operator.imul(x,y), # Equivalent to x *= y
+                       'division': lambda x,y: operator.itruediv(x,y), # Equivalent to x /= y
+                       'power': lambda x,y: operator.ipow(x,y)} # Equivalent to x **= y
+    @pytest.mark.parametrize('func', INCREMENT_FUNCS.values(), ids=INCREMENT_FUNCS.keys())
+    @pytest.mark.parametrize('val', [2, 2.0, np.array([2.0])], ids=['int', 'float', 'array'])
+    def test_increment_with_scalar_or_array(self, std_contents, val, func):
+        arraytainer = self.container_class(std_contents)
+        key = self.array_constructor(val) if utils.is_array(val) else val
+        expected, _ = utils.apply_func_to_contents(std_contents, func=func, args=(key,), throw_exception=True)
+        result = func(arraytainer, key)
+        utils.assert_equal_values(expected, result.unpacked)
+        utils.assert_same_types(self.container_class(expected), result)
+
     RESHAPE_TEST_CASES = {
     'reshape_list_using_tuple': cartesian_prod( [(6,2),(1,12)], ( ((3,4),None), ((12,), None), ((2,4),'reshape_error') ), 'tuple' ),
     'reshape_dict_using_tuple': cartesian_prod( {'a':(2,2),'b':(4,1)}, ( ((1,4),None), ((2,2), None), ((2,4),'reshape_error') ), 'tuple' ),

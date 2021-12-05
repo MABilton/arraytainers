@@ -23,8 +23,8 @@ class Mixin:
         return args
 
     def _prepare_kwargs(self, kwargs, key):
-        kwargs = {key_i: (val_i[key] if self.is_container(val_i) else val_i)
-                  for key_i, val_i in kwargs.items()}
+        kwargs = {kwarg_key: tuple(val_i[key] if self.is_container(val_i) else val_i for val_i in val) 
+                  for kwarg_key, val in kwargs.items()}
         return kwargs
 
     def _check_container_compatability(self, args, kwargs):

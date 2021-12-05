@@ -3,6 +3,7 @@ import functools
 import numpy as np
 from numpy import ndarray
 from numpy.lib.mixins import NDArrayOperatorsMixin
+from copy import deepcopy
 
 from . import getset, func_handlers, preprocess, arrays
 
@@ -33,7 +34,7 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
             contents = list(contents)
 
         # Need to be careful when copying Jax arrays - this actually returns a Numpy array:
-        self.contents = contents.copy()
+        self.contents = recursive_copy(contents)
         self._type = dict if hasattr(self.contents, 'keys') else list
         self.check_keys()
 
@@ -45,23 +46,26 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
         return f"{self.__class__.__name__}({repr(self.unpacked)})"
 
     def copy(self):
-        return self.__class__(self.contents.copy())
+        return self.__class__(deepcopy(self.unpacked))
 
     # Key/Item methods:
     def keys(self):
         if self._type is dict:
-            keys = [key for key in self.contents.keys()]
+            keys = (key for key in self.contents.keys())
         else:
-            keys = tuple(i for i in range(len(self.contents)))
+            keys = (i for i in range(len(self.contents)))
         return keys
 
     def values(self, unpacked=False):
         contents = self.unpacked if unpacked else self
-        return tuple(contents[key] for key in self.keys())
+        return (contents[key] for key in self.keys())
 
     def items(self, unpacked=False):
         contents = self.unpacked if unpacked else self
-        return tuple((key, contents[key]) for key in self.keys())
+        return ((key, contents[key]) for key in self.keys())
+
+    def __iter__(self):
+        return self.values()
 
     # Type-checking methods:
     def is_array(self, val):
@@ -89,6 +93,14 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
         return flatten_contents(unpacked)
 
 # Helper functions
+def recursive_copy(vals):
+    if isinstance(vals, (list, tuple)): 
+        return [recursive_copy(val) for val in vals]
+    elif isinstance(vals, dict):
+        return {key:recursive_copy(val) for key, val in vals.items()}
+    else:
+        return vals.copy()
+
 def flatten_contents(contents, array_list=None):
 
     array_list = [] if array_list is None else array_list
