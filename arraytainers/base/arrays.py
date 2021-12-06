@@ -41,7 +41,7 @@ class Mixin:
     # Sums up all elements stored in arraytainer:
     def sum_elements(self):
         
-        if len(self.keys()) > 0:
+        if list(self.keys()):
             sum_results = functools.reduce(lambda x,y: x+y, [val for val in self.values()])
         else:
             sum_results = 0
@@ -56,14 +56,20 @@ class Mixin:
         to_sum = self.list_arrays()
         return self.array(sum(to_sum))
 
-    # Shape methods:
-    @property
-    def shape(self):
-        shapes = [self[key].shape for key in self.keys()]
+    # Shape methods: 
+    def get_shapes(self, return_arraytainer=True):
+        shapes = [self[key].get_shapes(return_arraytainer=False) if self.is_container(self[key]) 
+                  else self[key].shape for key in self.keys()]
         if self._type is dict:
             shapes = dict(zip(self.keys(), shapes))
-        return self.__class__(shapes, greedy_array_conversion=True)
-    
+        if return_arraytainer:
+            shapes = self.__class__(shapes, greedy_array_conversion=True)
+        return shapes
+
+    @property
+    def shape(self):
+        return self.get_shapes()
+
     def reshape(self, new_shapes):
         return np.reshape(self, new_shapes)
 

@@ -32,8 +32,8 @@ class IterableMixin:
             items = tuple((i, val) for i, val in enumerate(std_contents))
  
         assert set(arraytainer.keys()) == set(keys)
-        utils.assert_equal_values(arraytainer.values(unpacked=True), values)
-        for result, expected in zip(arraytainer.items(unpacked=True), items):
+        utils.assert_equal_values(tuple(arraytainer.values(unpacked=True)), values)
+        for result, expected in zip(tuple(arraytainer.items(unpacked=True)), items):
             # Compare keys:
             assert result[0] == expected[0]
             # Compare arrays:

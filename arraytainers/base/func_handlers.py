@@ -54,7 +54,7 @@ class Mixin:
         if container_list:
         # Get keys, type, and length of first container:
             container_0 = container_list[0]
-            keys_0 = container_0.keys()
+            keys_0 = set(container_0.keys())
             type_0 = container_0._type
             len_0 = len(container_0)
 
@@ -72,7 +72,7 @@ class Mixin:
                 raise KeyError(' '.join(error_msg))
             
             # Ensure containers have same keys:
-            if container_i.keys() != keys_0:
+            if set(container_i.keys()) != keys_0:
                 error_msg = ('Containers being combined through operations must',
                              'have identical sets of keys.')
                 raise KeyError(' '.join(error_msg))

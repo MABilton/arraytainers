@@ -12,6 +12,7 @@ class Mixin:
 
   def _convert_contents_to_arrays(self, greedy_array_conversion):
     converted_contents, _ = self._convert_contents_to_arrays_recursion(self.contents, greedy_array_conversion, initial_call=True)
+    print(converted_contents)
     self.contents = converted_contents
 
   def _convert_contents_to_arrays_recursion(self, contents, greedy, initial_call=False):
@@ -28,10 +29,11 @@ class Mixin:
       
       val = contents[key]
 
-      # Contents of a container should already be converted:
+      # Can't convert arraytainer to array, but may need to convert type of arrays stored in this arraytainer:
       if self.is_container(val):
         can_convert[key] = False
-      
+        contents[key] = self.__class__(val.unpacked)
+ 
       # Can't convert dictionary to array, but may be able to convert values in dictionary to array(s):
       elif isinstance(val, dict):
         can_convert[key] = False
@@ -74,10 +76,5 @@ class Mixin:
         contents = {key:self.array(val) for key, val in contents.items()}  
       except AttributeError:
         contents = [self.array(val) for val in contents]
-
-      # # If we have only one convertable val, convert that val:
-      # if len(contents)==1:
-      #   first_key = tuple(keys)[0]
-      #   contents[first_key] = self.array(contents[first_key])
 
     return (contents, can_convert_all_vals)

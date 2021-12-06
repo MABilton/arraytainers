@@ -2,11 +2,18 @@ import pytest
 import numpy as np
 from copy import deepcopy
 from itertools import product
+import operator
 
 from . import utils
 from .utils import cartesian_prod
 
 class ArrayMixin:
+
+    def test_arraytainer_composition(self, std_contents):
+        arraytainer = self.container_class(std_contents)
+        arraytainer_2 = self.container_class(arraytainer)
+        utils.assert_equal_values(arraytainer.unpacked, arraytainer_2.unpacked)
+        utils.assert_same_types(arraytainer, arraytainer_2)
 
     def test_convert_array_types(self, std_shapes):
         for array_constructor in utils.ARRAY_CONSTRUCTORS:

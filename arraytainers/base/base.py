@@ -28,6 +28,8 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
 
         if self.is_array(contents):
             contents = [contents]
+        elif self.is_container(contents):
+            contents = contents.unpacked
         elif not hasattr(contents, '__len__'):
             contents = [contents]
         elif isinstance(contents, tuple):
