@@ -145,7 +145,7 @@ class SetterMixin:
 
     def _set_with_hash(self, key, new_value):
         
-        if not self.is_container(new_value):
+        if not (self.is_container(new_value) or self.is_array(new_value)):
             new_value = self.__class__(new_value)
 
         try:
