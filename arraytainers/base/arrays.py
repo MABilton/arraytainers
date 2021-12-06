@@ -1,6 +1,7 @@
 import numpy as np
 import functools
-    
+from numbers import Number
+
 class Mixin:
     
     def array(self, x):
@@ -70,7 +71,9 @@ class Mixin:
     def shape(self):
         return self.get_shapes()
 
-    def reshape(self, new_shapes):
+    def reshape(self, *new_shapes):
+        if len(new_shapes)==1 and not isinstance(new_shapes[0], Number):
+            new_shapes = new_shapes[0]
         return np.reshape(self, new_shapes)
 
     def flatten(self):
