@@ -131,6 +131,14 @@ class ArrayMixin:
             result = arraytainer.reshape(new_shape)
             utils.assert_equal_values(result.unpacked, expected)
             utils.assert_same_types(result, self.container_class(expected))
+            
+            # If using a tuple to reshape, 
+            if new_shape_type=='tuple':
+                arraytainer_2 = self.container_class(contents)
+                result_2 = arraytainer.reshape(*new_shape)
+                utils.assert_equal_values(result_2.unpacked, expected)
+                utils.assert_same_types(result_2, self.container_class(expected))
+
         else:
             new_shape = self.container_class(new_shape, greedy_array_conversion=True) if new_shape_type=='arraytainer' else new_shape
             self.assert_exception(reshape_func, exception, arraytainer, new_shape)
