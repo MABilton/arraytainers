@@ -30,8 +30,8 @@ class FunctionMixin:
         self.perform_function_test(std_contents, func=np_func)
 
     UFUNC_TEST_CASES = {'addition': lambda x,y:x+y, 'subtraction': lambda x,y:x-y, 'multiplication': lambda x,y:x*y, 
-                        'division': lambda x,y:x/y, 'exponent': lambda x,y:x**y, 'floor_div': lambda x,y:x//y,
-                        'less_than': lambda x,y:x<y, 'greater_than_or_equal_to': lambda x,y:x>=y, 'equality': lambda x,y: x==y}
+                        'division': lambda x,y:x/y, 'exponent': lambda x,y:x**y, 'less_than': lambda x,y:x<y, 
+                        'greater_than_or_equal_to': lambda x,y:x>=y, 'equality': lambda x,y: x==y}
     @pytest.mark.parametrize('ufunc', UFUNC_TEST_CASES.values(), ids=UFUNC_TEST_CASES.keys())
     @pytest.mark.parametrize('scalar', [2, 2.0], ids=['int', 'float'])
     def test_ufunc_scalar(self, std_contents, scalar, ufunc):

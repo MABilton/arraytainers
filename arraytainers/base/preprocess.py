@@ -12,7 +12,6 @@ class Mixin:
 
   def _convert_contents_to_arrays(self, greedy_array_conversion):
     converted_contents, _ = self._convert_contents_to_arrays_recursion(self.contents, greedy_array_conversion, initial_call=True)
-    print(converted_contents)
     self.contents = converted_contents
 
   def _convert_contents_to_arrays_recursion(self, contents, greedy, initial_call=False):
@@ -23,7 +22,6 @@ class Mixin:
       keys = range(len(contents))
 
     can_convert = {}
-    print_flag=False
 
     for key in keys:
       
