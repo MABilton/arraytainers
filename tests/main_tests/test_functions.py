@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+from numbers import Number
 from . import utils
 from .utils import cartesian_prod
 
@@ -131,3 +132,21 @@ class FunctionMixin:
     def test_kron(self, contents_list, exception):
         kron_func = lambda x,y : np.kron(x, y)
         self.perform_function_test(*contents_list, func=kron_func, exception=exception)
+    
+    MEAN_AXIS_AND_EXCEPTIONS = ( (None, None), (0, None), (1, None), ((0,1), None), (2, Exception) )
+    MEAN_TEST_CASES = \
+    {'list': cartesian_prod( [(2,3,2),[(2,1),(2,2)]], MEAN_AXIS_AND_EXCEPTIONS),
+     'dict': cartesian_prod( {'a':(2,3), 'b':{'c':(2,1,2),'d':(2,2)}}, MEAN_AXIS_AND_EXCEPTIONS ),
+     'mixed': cartesian_prod( [{'a':[(2,2,2),(1,3)],'b':{'c':(2,2)}}, {'a':[(2,1,3),(1,2)],'b':{'e':(2,2)}}], MEAN_AXIS_AND_EXCEPTIONS )
+    }
+    @pytest.mark.parametrize('contents, axis, exception', utils.unpack_test_cases(MEAN_TEST_CASES), 
+                                                          ids=utils.unpack_test_ids(MEAN_TEST_CASES), 
+                                                          indirect=['contents'])
+    def test_mean(self, contents, axis, exception):
+        def mean_func(x, axis):
+            result = np.mean(x, axis=axis)
+            if isinstance(result, Number):
+                result = self.array_constructor(result)
+            return result
+
+        self.perform_function_test(contents, func=mean_func, args=(axis,), exception=exception)
