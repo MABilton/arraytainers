@@ -1,4 +1,5 @@
 from copy import deepcopy
+from more_itertools import always_iterable
 
 class Mixin:
     # Applies a (potentially custom) functon to each value in array:
@@ -41,9 +42,16 @@ class Mixin:
         return args
 
     def _prepare_kwargs(self, kwargs, key):
-        kwargs = {kwarg_key: tuple(val_i[key] if self.is_container(val_i) else val_i for val_i in val) 
-                  for kwarg_key, val in kwargs.items()}
-        return kwargs
+
+        new_kwargs = {}
+        for kwarg_key, val in kwargs.items():
+            # If 'None' is passed as a keyword value:
+            if not list(always_iterable(val)):
+                new_kwargs[kwarg_key] = val
+            else:
+                new_kwargs[kwarg_key] = tuple(val_i[key] if self.is_container(val_i) else val_i for val_i in always_iterable(val)) 
+
+        return new_kwargs
 
     def _check_container_compatability(self, args, kwargs):
         

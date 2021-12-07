@@ -136,8 +136,6 @@ def assert_equal_values(contents_1, contents_2, approx_equal=True):
       # Must specify no key broadcasting - we want this to throw an error if we don't have matching sets of keys:
       apply_func_to_contents(contents_1, contents_2, key_broadcasting=False, func=assert_func, throw_exception=True)
   except Exception as e:
-      print(contents_1)
-      print(contents_2)
       raise Exception(f'Values {contents_1} and {contents_2} not equal.')
 
 # Function to apply a function to a list of contents:
