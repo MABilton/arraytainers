@@ -60,15 +60,17 @@ class IndexMixin:
         else:
             self.assert_exception(lambda x, key: x[key], exception, arraytainer, key)
 
+    SLICES_CASES = ( (None, None), (slice(None,None), None), ((None, slice(None,None)), None),
+                     ((None, None, slice(None,None)), None), (slice(1),None), (slice(1,5),None),
+                     (slice(1,5,2),None), ((0,0), None), ((1,1), None), ((None, 0), None), ((slice(0,5,2),1),None),
+                     ((None,slice(0,5,2),1), None), ((slice(0,5,2),slice(1,6,2)), None), 
+                     ((slice(0,4,2), slice(0,4,2), slice(0,4,2)), IndexError), ((15,15), 'numpy_index_error') )
     SLICE_INDEXING_TEST_CASES = \
-    {'simple_dict': cartesian_prod( {'a':(6,),'b':(7,)}, ( (slice(1),None), (slice(1,5),None), (slice(1,10,2),None), 
-                                                            ((slice(1,5,2), slice(1,5,2)),'key_error') ) ),
-     'simple_list': cartesian_prod( [(3,3),(2,2)], ( (slice(1),None), (slice(0,2),None), ((slice(0),slice(0,2)),None) ) ),
-     'nested_list': cartesian_prod( [[(2,2,2),(2,)],(2,1)], ( (slice(0,2),None), ((slice(0,0),slice(0,0)),'key_error') ) ),
-     'nested_dict': cartesian_prod( {'a':(2,1),'b':{'c':(2,2),'d':(2,)},'c':(1,1)}, 
-                                            ( (slice(0,2), None), ((slice(0,0),slice(0,0)),'key_error') ) ),
-     'mixed': cartesian_prod( {'a':[(1,2),(3,),{'c':(3,2)}],'b':{'c':[(2,1),(2,2)]}}, 
-                                            ( (slice(0,2),None), ((slice(0,0),slice(0,0)),'key_error') ) )
+    {'simple_dict': cartesian_prod( {'a':(2,3),'b':(3,4)}, SLICES_CASES ),
+     'simple_list': cartesian_prod( [(3,3),(2,4)], SLICES_CASES ),
+     'nested_list': cartesian_prod( [[(3,2),(2,3)],(4,2)], SLICES_CASES ),
+     'nested_dict': cartesian_prod( {'a':(2,4),'b':{'c':(3,2),'d':(2,4)},'c':(3,3)}, SLICES_CASES ),
+     'mixed': cartesian_prod( {'a':[(3,2),(3,3),{'c':(2,3)}],'b':{'c':[(2,4),(3,2)]}}, SLICES_CASES )
     }
     @pytest.mark.parametrize('contents, slice_val, exception', utils.unpack_test_cases(SLICE_INDEXING_TEST_CASES),
                                                               ids=utils.unpack_test_ids(SLICE_INDEXING_TEST_CASES),
@@ -76,7 +78,15 @@ class IndexMixin:
     def test_indexing_with_slice(self, contents, slice_val, exception):
 
         arraytainer = self.container_class(contents)
-        index_func = lambda contents : contents[slice_val]
+
+        def index_func(contents):
+            result = contents[slice_val]
+            return self.array_constructor(result) if not utils.is_array(result) else result
+
+        # Strangely enough, Jax arrays don't throw index errors when the dimension of a slice exceeds a particular
+        # dimension; consequently, we need to adjust the behaviour of the test for Jaxtainers:
+        if exception=='numpy_index_error':
+            exception = IndexError if 'numpy' in self.__class__.__name__.lower() else None
 
         if exception is None:
             result = arraytainer[slice_val]

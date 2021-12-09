@@ -3,6 +3,7 @@ import pytest
 import operator
 import numpy as np
 from copy import deepcopy
+from itertools import product
 from . import utils
 from .utils import cartesian_prod
 
@@ -51,23 +52,40 @@ class SetMixin:
                                                                        ids=utils.unpack_test_ids(SET_METHOD_TEST_CASES), 
                                                                        indirect=['contents_list'])
     def test_set_and_copy_method(self, contents_list, key_iterable, exception):
-        contents, new_val = contents_list
-        arraytainer, new_val_arraytainer = [self.container_class(x) for x in contents_list]
+        
+        contents, new_val_contents = contents_list
         
         if exception is None:
-            arraytainer_2 = arraytainer.copy()
-            contents_copy = deepcopy(contents)
-            # Set value and check setting is correct:
-            utils.set_contents_item(contents, key_iterable, new_val)
-            arraytainer.set(new_val, *key_iterable)
-            utils.assert_equal_values(arraytainer.unpacked, contents)
-            utils.assert_same_types(arraytainer, self.container_class(contents))
+          contents_copy = deepcopy(contents)
+          utils.set_contents_item(contents_copy, key_iterable, new_val_contents)
+
+          # Test two independent sets of conditions:
+          #    1. key_iterables passed as unpacked tuple vs passed as packed tuple
+          #    2. new_val is an arraytainer vs new_val is not an arraytainer 
+          # If contents is just a lone array, do NOT test situation where new_val_contents is converted
+          # to arraytainer, since doing so will place array in a list:
+          val_is_container_tests = (False, True) if not utils.is_array(new_val_contents) else (False,)
+          for unpack_keys, val_is_container in product((False, True), val_is_container_tests):
+            arraytainer = self.container_class(contents)
+            arraytainer_copy = arraytainer.copy()
+            new_val = self.container_class(new_val_contents) if val_is_container else new_val_contents
+            if unpack_keys:
+              arraytainer.set(new_val, *key_iterable)
+            else:
+              arraytainer.set(new_val, key_iterable)
+            utils.assert_equal_values(arraytainer.unpacked, contents_copy)
+            utils.assert_same_types(arraytainer, self.container_class(contents_copy))
             # Esure setting has not affected copy of arraytainer:
-            utils.assert_equal_values(arraytainer_2.unpacked, contents_copy)
+            utils.assert_equal_values(arraytainer_copy.unpacked, contents)
         
         else:
+          arraytainer = self.container_class(contents)
+          # Throw exception when new_val is a list/dict and when container
+          for new_val in (new_val_contents, self.container_class(new_val_contents)):
             self.assert_exception(lambda arraytainer, new_val, key_iterable : arraytainer.set(new_val, *key_iterable),
                                   exception, arraytainer, new_val, key_iterable)
+
+          
 
     # APPEND_METHOD_TEST_CASES
     # def test_append_method(self, contents, key_iterable, new_value, exception):
