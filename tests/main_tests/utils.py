@@ -128,7 +128,7 @@ def assert_equal_values(contents_1, contents_2, approx_equal=True):
     if approx_equal:
         # Need to adjust atol and rtol because, by default, Jax uses 32 bit numbers which means,
         # when compared to 64 bit Numpy computations, the default tolerances throw spurious errors:
-      assert np.allclose(contents_1, contents_2, atol=1e-5, rtol=1e-5)
+        assert np.allclose(contents_1, contents_2, atol=1e-5, rtol=1e-5)
     else:
       assert contents_1 == contents_2
 

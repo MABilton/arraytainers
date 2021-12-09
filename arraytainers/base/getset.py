@@ -1,11 +1,11 @@
 
 from more_itertools.more import always_iterable
+from numbers import Number
 
 def is_slice(key):
-    return all(isinstance(val, slice) for val in always_iterable(key))
-
-def is_tuple_of_ints(key):
-    return isinstance(key, tuple) and all(isinstance(val, int) for val in always_iterable(key))
+    is_tuple_of_slices = isinstance(key, tuple) and all(isinstance(val, (type(None), slice, int)) for val in always_iterable(key))
+    is_lone_slice = isinstance(key, (slice, type(None)))
+    return is_tuple_of_slices or is_lone_slice
 
 class GetterMixin:
     
@@ -13,9 +13,9 @@ class GetterMixin:
         return ()
 
     def check_keys(self):
-        invalid_keys = [str(key) for key in self.keys() if is_tuple_of_ints(key)]
+        invalid_keys = [str(key) for key in self.keys() if is_slice(key)]
         if invalid_keys:
-            raise KeyError(f'Cannot use {", ".join(invalid_keys)}, tuple(s) of ints, as key(s) in an Arraytainer.')
+            raise KeyError(f'Cannot use {", ".join(invalid_keys)}, which are interpreted as array slices, as key(s) in an Arraytainer.')
 
     def get(self, *key_iterable):
         key_iterable = list(key_iterable)
@@ -34,7 +34,7 @@ class GetterMixin:
             item = self._index_with_container(key)
         elif self.is_array(key):
             item = self._index_with_array(key)
-        elif is_slice(key) or is_tuple_of_ints(key):
+        elif is_slice(key):
             item = self._index_with_slices(key)
         else:
             item = self._index_with_hash(key)
@@ -90,20 +90,31 @@ class SetterMixin:
             _attempt_append(self.contents, new_val) 
 
     def set(self, new_val, *key_iterable):
+
+        if not key_iterable:
+            raise KeyError('Must specify at least one key when using the set method.')
+
+        # If key_iterable is provided by the user as a list/tuple:
+        if len(key_iterable) == 1 and isinstance(key_iterable[0], (tuple,list)):
+            key_iterable = key_iterable[0]
+            
         key_iterable = list(key_iterable)
         key_i = key_iterable.pop(0)
+
         if key_iterable:
             self[key_i].set(new_val, *key_iterable)
         else:
             try:
-                new_val = self.__class__(new_val) if not self.is_array(new_val) else new_val
-                self.contents[key_i] = new_val
+                self[key_i] = new_val
             except AttributeError:
                 error_msg = ("Unable to new assign items to a list-like container;",
                              "use the append method instead.")
                 raise AttributeError(' '.join(error_msg))
 
     def __setitem__(self, key, new_value):
+
+        new_value = self._preprocess_set_new_value(new_value)
+        
         if self.is_container(key):
             self._set_with_container(key, new_value)
         # Interpret indexing with list/dict as a container:
@@ -112,14 +123,19 @@ class SetterMixin:
             item = self._set_with_container(key, new_value)
         elif self.is_array(key):
             self._set_with_array(key, new_value)
-        elif is_slice(key) or is_tuple_of_ints(key):
+        elif is_slice(key):
             self._set_with_slices(key, new_value)
         else:
             self._set_with_hash(key, new_value)    
 
+    def _preprocess_set_new_value(self, new_val):
+        if isinstance(new_val, Number):
+            new_val = self.array(new_val)
+        elif not self.is_array(new_val):
+            new_val = self.__class__(new_val) 
+        return new_val
+
     def _set_with_container(self, container_key, new_value):
-        # If new_value is a dict/list, interpret that as an arraytainer:
-        new_value = self.__class__(new_value) if isinstance(new_value, (dict,list,tuple)) else new_value
         for key in self.keys():
             value_i = new_value[key] if self.is_container(new_value) else new_value
             idx_i = container_key[key]
