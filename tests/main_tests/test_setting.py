@@ -85,8 +85,6 @@ class SetMixin:
             self.assert_exception(lambda arraytainer, new_val, key_iterable : arraytainer.set(new_val, *key_iterable),
                                   exception, arraytainer, new_val, key_iterable)
 
-          
-
     # APPEND_METHOD_TEST_CASES
     # def test_append_method(self, contents, key_iterable, new_value, exception):
     #     pass

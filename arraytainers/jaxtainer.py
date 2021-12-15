@@ -6,11 +6,12 @@ from .base.base import Arraytainer
 @register_pytree_node_class
 class Jaxtainer(Arraytainer):
 
+    array_type = jnp.DeviceArray
+
     # May want only floats stored for autograd purposes:    
     def __init__(self, contents, convert_to_arrays=True, greedy_array_conversion=False, floats_only=False, _containerise_contents=True):
 
         self.array_class = (lambda x : jnp.array(x).astype(float)) if floats_only else jnp.array
-        self.array_type = jnp.DeviceArray
 
         super().__init__(contents)
 

@@ -12,9 +12,6 @@ class ArraytainerTests(ArrayMixin, FunctionMixin, IndexMixin, IterableMixin, Set
     # Attributes which have different values for Jax and Numpy testing classes:
     container_class = None
     array_class = None
-    # container_class = None
-    # array = None
-    # array_types = None
 
     # Convenience method to assert that a particular function call throws a particular exception:
     def assert_exception(self, function, exception, *args, **kwargs):

@@ -1,3 +1,4 @@
+from numbers import Number
 
 class Mixin:
   
@@ -22,10 +23,18 @@ class Mixin:
       keys = range(len(contents))
 
     can_convert = {}
+    lens = []
 
     for key in keys:
       
       val = contents[key]
+
+      # First, get length of val (numbers have len = 1):
+      try:
+        len_i = len(val)
+      except TypeError:
+        len_i = 1
+      lens.append(len_i)
 
       # Can't convert arraytainer to array, but may need to convert type of arrays stored in this arraytainer:
       if self.is_container(val):
@@ -61,7 +70,9 @@ class Mixin:
       else:
         can_convert[key] = True
 
-    can_convert_all_vals = all(can_convert.values())
+    # To convert all values, each individual value must be convertible AND of the same length:
+    all_same_length = all([x==lens[0] for x in lens])
+    can_convert_all_vals = all(can_convert.values()) and all_same_length
 
     # Convert individual vals if we can't convert all vals at this level: 
     if not can_convert_all_vals:

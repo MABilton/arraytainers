@@ -3,15 +3,10 @@ import functools
 from numbers import Number
 
 class Mixin:
-    
+
     def array(self, x):
         if self.is_container(x):
             return x
-        # elif self.is_array(x):
-        #     # Coverting from Jax to Numpy array can change shape:
-        #     before_shape = x.shape
-        #     x = self.array_class(x)
-        #     return x.reshape(before_shape)
         else:
             return self.array_class(x)
 
@@ -71,10 +66,14 @@ class Mixin:
     def shape(self):
         return self.get_shapes()
 
-    def reshape(self, *new_shapes):
+    def reshape(self, *new_shapes, order='C'):
         if len(new_shapes)==1 and not isinstance(new_shapes[0], Number):
             new_shapes = new_shapes[0]
-        return np.reshape(self, new_shapes)
+        return np.reshape(self, new_shapes, order=order)
 
-    def flatten(self):
-        return np.ravel(self)
+    def flatten(self, order='C', return_array=True):
+        output = np.ravel(self, order=order)
+        if return_array:
+            output = output.list_arrays()
+            output = np.concatenate(output)
+        return output

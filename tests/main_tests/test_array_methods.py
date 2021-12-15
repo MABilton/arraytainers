@@ -9,6 +9,39 @@ from .utils import cartesian_prod
 
 class ArrayMixin:
 
+    def test_flatten_and_from_vector_constructor(self, std_contents_and_shapes): 
+        
+        std_contents, std_shapes = std_contents_and_shapes
+        arraytainer = self.container_class(std_contents)
+        shapes_arraytainer = self.container_class(std_shapes, greedy_array_conversion=True)
+
+        for order in ('C', 'F'):
+            # Flatten individual vectors within contents structure:
+            contents = deepcopy(std_contents)
+            expected, _ = utils.apply_func_to_contents(contents, func=lambda x: np.ravel(x, order=order))
+            result = arraytainer.flatten(order=order, return_array=False)
+            utils.assert_equal_values(expected, result.unpacked)
+            utils.assert_same_types(self.container_class(expected), result)
+
+            # Flatten contents into single vector:
+            contents = deepcopy(std_contents)
+            list_of_arrays = utils.get_list_of_arrays(contents)
+            flattened_arrays = [x.flatten(order=order) for x in list_of_arrays]
+            # Will throw error if flattening empty arrays - make sure arraytainers throw same error:
+            try:
+                expected = self.array_constructor(np.concatenate(flattened_arrays))
+                result = arraytainer.flatten(order=order)
+                utils.assert_equal_values(expected, result)
+                # Check that we can construct original arraytainer from flattened; must work when shape is provided
+                # as a list/dict AND when provided as an arraytainer:
+                vector = deepcopy(expected)
+                for shape in (std_shapes, shapes_arraytainer):
+                    result = self.container_class.from_vector(vector, shape, order=order)
+                    utils.assert_equal_values(std_contents, result.unpacked)
+                    utils.assert_same_types(arraytainer, result)
+            except ValueError as exception:
+                self.assert_exception(lambda x: x.flatten(order=order), exception, arraytainer)
+
     def test_arraytainer_composition(self, std_contents):
         arraytainer = self.container_class(std_contents)
         arraytainer_2 = self.container_class(arraytainer)
@@ -152,6 +185,8 @@ class ArrayMixin:
                       ([[[1,2],[3,4]]], [np.array([[1,2],[3,4]])]) ],
     'simple_dicts': [ ({'a': 2}, {'a': np.array(2)}), 
                       ({'a':2,'b': [[3]]}, {'a':np.array(2),'b':np.array([[3]])}) ],
+    'list_of_different_lens': [( [[[2],[2,3],[2,3,4]]], [[np.array([2]),np.array([2,3]),np.array([2,3,4])]] ),
+                               ( [[[2,2],[2,2]], [[2,2,2],[2,1]]], [np.array([[2,2],[2,2]]), [np.array([2,2,2]),np.array([2,1])]] ) ],
     'list_with_array': [ ([[np.array(2)]], [[np.array(2)]]) ],
     'list_with_dict_and_list': [ ([{'a': 2}, [[2,2],[2,2]]], [{'a': np.array(2)}, np.array([[2,2],[2,2]])]) ],
     'dict_with_convertible_contents': [ ({'a':[[2]],'b':{'c':[3]}}, {'a':np.array([[2]]),'b':{'c':np.array([3])}}),

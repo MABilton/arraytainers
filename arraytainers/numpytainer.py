@@ -3,10 +3,10 @@ from .base.base import Arraytainer
 
 class Numpytainer(Arraytainer):
 
-  def __init__(self, contents, convert_to_arrays=True, greedy_array_conversion=False):
+  array_type = np.ndarray
+  array_class = np.array
 
-      self.array_type = np.ndarray
-      self.array_class = np.array
+  def __init__(self, contents, convert_to_arrays=True, greedy_array_conversion=False):
 
       super().__init__(contents)
 
