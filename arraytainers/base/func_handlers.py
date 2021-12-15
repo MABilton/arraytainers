@@ -48,8 +48,12 @@ class Mixin:
             # If 'None' is passed as a keyword value:
             if not list(always_iterable(val)):
                 new_kwargs[kwarg_key] = val
+            elif isinstance(val, (list,tuple)):
+                new_kwargs[kwarg_key] = tuple(val_i[key] if self.is_container(val_i) else val_i for val_i in val)
+            elif self.is_container(val):
+                new_kwargs[kwarg_key] = val[key]
             else:
-                new_kwargs[kwarg_key] = tuple(val_i[key] if self.is_container(val_i) else val_i for val_i in always_iterable(val)) 
+                new_kwargs[kwarg_key] = val
 
         return new_kwargs
 

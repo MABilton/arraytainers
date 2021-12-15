@@ -40,6 +40,25 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
         self._type = dict if hasattr(self.contents, 'keys') else list
         self.check_keys()
 
+    @classmethod
+    def from_vector(cls, vector, shapes, order='C'):
+
+        try:
+            vector = vector.flatten(order=order).tolist()
+        except AttributeError:
+            error_msg = ('Only arrays which can be converted to lists are', 
+                         'allowed to be passed to the from_vector constructor.')
+            raise ValueError(' '.join(error_msg))
+
+        if isinstance(shapes, (list, dict, tuple)):
+            shapes = cls(shapes, greedy_array_conversion=True)
+        elif not cls.is_container(shapes):
+            raise ValueError('Shapes input must be either a list, dict, or arraytainer.')
+        
+        new_contents = from_vector_recursion(vector, shapes, order)
+
+        return cls(new_contents)
+
     # Generic methods:       
     def __len__(self):
         return len(self.contents)
@@ -70,8 +89,9 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
         return self.values()
 
     # Type-checking methods:
-    def is_array(self, val):
-        return isinstance(val, self.supported_arrays)
+    @classmethod
+    def is_array(cls, val):
+        return isinstance(val, cls.supported_arrays)
         
     @staticmethod
     def is_container(val):
@@ -95,13 +115,21 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
         return flatten_contents(unpacked)
 
 # Helper functions
-def recursive_copy(vals):
-    if isinstance(vals, (list, tuple)): 
-        return [recursive_copy(val) for val in vals]
-    elif isinstance(vals, dict):
-        return {key:recursive_copy(val) for key, val in vals.items()}
-    else:
-        return vals.copy()
+
+def from_vector_recursion(vector, shapes, order, output=None):
+    
+    if output is None:
+        output = shapes.copy().unpacked
+
+    for key, shape in shapes.items():
+        if Arraytainer.is_array(shape):
+            num_vals = np.prod(shape)
+            vals_i = np.array([vector.pop(0) for _ in range(num_vals)])
+            output[key] = vals_i.reshape(shape, order=order)
+        else:
+            output[key] = from_vector_recursion(vector, shape, order, output=output[key])
+    
+    return output
 
 def flatten_contents(contents, array_list=None):
 

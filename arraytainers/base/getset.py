@@ -26,6 +26,8 @@ class GetterMixin:
             return self.contents[key_i]
 
     def __getitem__(self, key):
+        # print(self)
+        # print(key)
         if self.is_container(key):
             item = self._index_with_container(key)
         # Interpret indexing with list/dict as a container:
