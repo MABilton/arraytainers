@@ -2,6 +2,7 @@ from copy import deepcopy
 from more_itertools import always_iterable
 
 class Mixin:
+    
     # Applies a (potentially custom) functon to each value in array:
     def apply(self, func, skip_level=0, broadcast=True, args=(), kwargs=None):
         kwargs = {} if kwargs is None else kwargs
@@ -38,8 +39,16 @@ class Mixin:
 
     # Helper functions used by manage_function_call in NumpyContainer and JaxContainer:
     def _prepare_args(self, args, key):
-        args = [arg_i[key] if self.is_container(arg_i) else arg_i for arg_i in args]
-        return args
+        new_args = []
+        for arg_i in args:
+            if self.is_container(arg_i):
+                new_args.append(arg_i[key])
+            # Tuple arg may contain arryatainer entries:
+            elif isinstance(arg_i, tuple):
+                new_args.append(self._prepare_args(arg_i, key))
+            else:
+                new_args.append(arg_i)
+        return tuple(new_args)
 
     def _prepare_kwargs(self, kwargs, key):
 

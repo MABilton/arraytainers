@@ -1,5 +1,6 @@
 from warnings import warn
 
+from .base import Arraytainer
 from .numpytainer import Numpytainer
 try:
     from .jaxtainer import Jaxtainer
