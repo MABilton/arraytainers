@@ -67,8 +67,33 @@ class Mixin:
         return self.get_shapes()
 
     def reshape(self, *new_shapes, order='C'):
-        if len(new_shapes)==1 and not isinstance(new_shapes[0], Number):
+
+        # Combine new shapes into single arraytainer if new_shapes contains
+        # a combination of arraytainer/non-arraytainer values:
+        processed_new_shapes = []
+        is_arraytainer = False
+        for shape_i in new_shapes:
+            if isinstance(shape_i, (list, dict)):
+                shape_i = self.__class__(shape_i)
+            if self.is_container(shape_i):
+                # If shape_i is the non-first arraytainer encountered:
+                if is_arraytainer:
+                    processed_new_shapes = np.append(processed_new_shapes, shape_i)
+                # If shape_i is first arraytainer encountered:
+                else:
+                    is_arraytainer = True 
+                    # Convert processed_new_shapes to array or jax.numpy.insert throws error:    
+                    processed_new_shapes = np.insert(shape_i, 0, self.array_class(processed_new_shapes))  
+            else:
+                if is_arraytainer:
+                    processed_new_shapes = np.append(processed_new_shapes, shape_i)
+                else:
+                    processed_new_shapes.append(shape_i)
+        new_shapes = processed_new_shapes
+
+        if len(new_shapes)==1 and self.is_container(new_shapes[0]):
             new_shapes = new_shapes[0]
+
         return np.reshape(self, new_shapes, order=order)
 
     def flatten(self, order='C', return_array=True):
