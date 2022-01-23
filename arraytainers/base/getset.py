@@ -31,16 +31,19 @@ class GetterMixin:
         if self.is_container(key):
             item = self._index_with_container(key)
         # Interpret indexing with list/dict as a container:
-        elif isinstance(key, (dict, list)):
-            key = self.__class__(key)
-            item = self._index_with_container(key)
+        # elif isinstance(key, (dict, list)):
+        #     key = self.__class__(key)
+        #     item = self._index_with_container(key)
         elif self.is_array(key):
             item = self._index_with_array(key)
         elif is_slice(key):
             item = self._index_with_slices(key)
         # Treat tuple which isn't a slice as a tuple of non-array keys:
-        elif isinstance(key, tuple):
-            item = {key_i: self[key_i] for key_i in key}
+        elif isinstance(key, (tuple, list, dict)):
+            if isinstance(key, dict):
+                item = {key_i: self[key_i][val_i] for key_i, val_i in key.items()}
+            else:
+                item = {key_i: self[key_i] for key_i in key}
             item = list(item.values()) if self._type is list else item
             item = self.__class__(item)
         else:
