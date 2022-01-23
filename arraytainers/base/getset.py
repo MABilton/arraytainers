@@ -1,9 +1,8 @@
 
-from more_itertools.more import always_iterable
 from numbers import Number
 
 def is_slice(key):
-    is_tuple_of_slices = isinstance(key, tuple) and all(isinstance(val, (type(None), slice, int)) for val in always_iterable(key))
+    is_tuple_of_slices = isinstance(key, tuple) and all(isinstance(val, (type(None), slice, int)) for val in key)
     is_lone_slice = isinstance(key, (slice, type(None)))
     return is_tuple_of_slices or is_lone_slice
 
@@ -13,9 +12,12 @@ class GetterMixin:
         return ()
 
     def check_keys(self):
-        invalid_keys = [str(key) for key in self.keys() if is_slice(key)]
-        if invalid_keys:
-            raise KeyError(f'Cannot use {", ".join(invalid_keys)}, which are interpreted as array slices, as key(s) in an Arraytainer.')
+        slice_keys = [str(key) for key in self.keys() if is_slice(key)]
+        if slice_keys:
+            raise KeyError(f'Cannot use {", ".join(slice_keys)}, which are interpreted as array slices, as key(s) in an Arraytainer.')
+        tuple_keys = [str(key) for key in self.keys() if isinstance(key, tuple)]
+        if tuple_keys:
+            raise KeyError(f'Cannot use the tuples {", ".join(tuple_keys)} as key(s) in an Arraytainer, since tuples are used to extract multiple elements.')
 
     def get(self, *key_iterable):
         key_iterable = list(key_iterable)
@@ -26,18 +28,21 @@ class GetterMixin:
             return self.contents[key_i]
 
     def __getitem__(self, key):
-        # print(self)
-        # print(key)
         if self.is_container(key):
             item = self._index_with_container(key)
         # Interpret indexing with list/dict as a container:
-        elif isinstance(key, (dict,list)):
+        elif isinstance(key, (dict, list)):
             key = self.__class__(key)
             item = self._index_with_container(key)
         elif self.is_array(key):
             item = self._index_with_array(key)
         elif is_slice(key):
             item = self._index_with_slices(key)
+        # Treat tuple which isn't a slice as a tuple of non-array keys:
+        elif isinstance(key, tuple):
+            item = {key_i: self[key_i] for key_i in key}
+            item = list(item.values()) if self._type is list else item
+            item = self.__class__(item)
         else:
             item = self._index_with_hash(key)
         return item
@@ -91,27 +96,27 @@ class SetterMixin:
         else:
             _attempt_append(self.contents, new_val) 
 
-    def set(self, new_val, *key_iterable):
+    # def set(self, new_val, *key_iterable):
 
-        if not key_iterable:
-            raise KeyError('Must specify at least one key when using the set method.')
+    #     if not key_iterable:
+    #         raise KeyError('Must specify at least one key when using the set method.')
 
-        # If key_iterable is provided by the user as a list/tuple:
-        if len(key_iterable) == 1 and isinstance(key_iterable[0], (tuple,list)):
-            key_iterable = key_iterable[0]
+    #     # If key_iterable is provided by the user as a list/tuple:
+    #     if len(key_iterable) == 1 and isinstance(key_iterable[0], (tuple,list)):
+    #         key_iterable = key_iterable[0]
             
-        key_iterable = list(key_iterable)
-        key_i = key_iterable.pop(0)
+    #     key_iterable = list(key_iterable)
+    #     key_i = key_iterable.pop(0)
 
-        if key_iterable:
-            self[key_i].set(new_val, *key_iterable)
-        else:
-            try:
-                self[key_i] = new_val
-            except AttributeError:
-                error_msg = ("Unable to new assign items to a list-like container;",
-                             "use the append method instead.")
-                raise AttributeError(' '.join(error_msg))
+    #     if key_iterable:
+    #         self[key_i].set(new_val, *key_iterable)
+    #     else:
+    #         try:
+    #             self[key_i] = new_val
+    #         except AttributeError:
+    #             error_msg = ("Unable to new assign items to a list-like container;",
+    #                          "use the append method instead.")
+    #             raise AttributeError(' '.join(error_msg))
 
     def __setitem__(self, key, new_value):
 
