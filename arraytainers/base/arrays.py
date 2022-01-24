@@ -91,7 +91,7 @@ class Mixin:
                     processed_new_shapes.append(shape_i)
         new_shapes = processed_new_shapes
 
-        if len(new_shapes)==1 and self.is_container(new_shapes[0]):
+        if len(new_shapes)==1 and (self.is_container(new_shapes[0]) or isinstance(new_shapes[0], tuple)):
             new_shapes = new_shapes[0]
 
         return np.reshape(self, new_shapes, order=order)

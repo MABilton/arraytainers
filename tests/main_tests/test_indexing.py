@@ -8,12 +8,12 @@ class IndexMixin:
     {'list': cartesian_prod( [[(2,1),[(2,),(1,)]],[(2,2),[(2,),(1,)]]], 
                                 ( ((0,), None), ((0,1), None) , ((0,1,0), None), ((1,1,1), None),
                                   ((2,), 'key_error'), ((0,0,0), AttributeError), ((1,1,2), 'key_error'), ((),'key_error') ) ),
-     'dict': cartesian_prod( {'a':{'c':{1:(1,2)},0:(2,2)},'b':{'a':(3,2),'b':{('a','b'):(2,1)}}},
+     'dict': cartesian_prod( {'a':{'c':{1:(1,2)},0:(2,2)},'b':{'a':(3,2),'b':{1:(2,1)}}},
                                 ( (('a',), None), (('a','c',1), None), (('b','b'), None),
                                   (('a',0), None), (('a','c','b'), 'key_error'), ((0,'c','b'), 'key_error'),
-                                  (('b','b',('a','b')), None), (('b','a','b'), AttributeError) , ((),'key_error') ) ),
-     'mixed': cartesian_prod( {'a':[(1,2),{1:(2,2),('a','b'):(2,3)},(2,2)],1:{'c':[(2,1),(1,2)],'d':(2,1)}},
-                                 ( (('a',), None), (('a',1),None), (('a',1,1),None), (('a',1,('a','b')),None), ((1,),None), 
+                                  (('b','b',1), None), (('b','a','b'), AttributeError) , ((),'key_error') ) ),
+     'mixed': cartesian_prod( {'a':[(1,2),{1:(2,2),1:(2,3)},(2,2)],1:{'c':[(2,1),(1,2)],'d':(2,1)}},
+                                 ( (('a',), None), (('a',1),None), (('a',1,1),None), (('a',1,1),None), ((1,),None), 
                                    ((1,'c'),None), ((1,'c',0),None), (('a',1,2),'key_error'), ((1,'c',2),'key_error'), 
                                    ((),'key_error') ) ) 
     }
@@ -146,7 +146,7 @@ class IndexMixin:
                                 ( {'a':np.array([[False,True],[True,True]]), 
                                   'b':[np.array([True,False,True]), {'c': np.array([True,False,False]), 
                                   'd': np.array([True,False,True])}]}, None ),
-                                ({'a':[np.array([False,True])],'b':np.array([True,False,True])}, 'key_error') ) )
+                                ({'a':[np.array([False,True])],'b':np.array([True,False,True,True])}, 'key_error') ) )
     }
     @pytest.mark.parametrize('contents, index_contents, exception', utils.unpack_test_cases(INDEX_CONTENTS_TEST_CASES), 
                                                                     ids=utils.unpack_test_ids(INDEX_CONTENTS_TEST_CASES),

@@ -1,9 +1,8 @@
 
-from more_itertools.more import always_iterable
 from numbers import Number
 
 def is_slice(key):
-    is_tuple_of_slices = isinstance(key, tuple) and all(isinstance(val, (type(None), slice, int)) for val in always_iterable(key))
+    is_tuple_of_slices = isinstance(key, tuple) and all(isinstance(val, (type(None), slice, int)) for val in key)
     is_lone_slice = isinstance(key, (slice, type(None)))
     return is_tuple_of_slices or is_lone_slice
 
@@ -13,9 +12,24 @@ class GetterMixin:
         return ()
 
     def check_keys(self):
-        invalid_keys = [str(key) for key in self.keys() if is_slice(key)]
-        if invalid_keys:
-            raise KeyError(f'Cannot use {", ".join(invalid_keys)}, which are interpreted as array slices, as key(s) in an Arraytainer.')
+        slice_keys = [str(key) for key in self.keys() if is_slice(key)]
+        if slice_keys:
+            raise KeyError(f'Cannot use {", ".join(slice_keys)}, which are interpreted as array slices, as key(s) in an Arraytainer.')
+        tuple_keys = [str(key) for key in self.keys() if isinstance(key, tuple)]
+        if tuple_keys:
+            raise KeyError(f'Cannot use the tuples {", ".join(tuple_keys)} as key(s) in an Arraytainer, since tuples are used to extract multiple elements.')
+
+    def filter(self, to_keep, *key_iterable):
+        if key_iterable:
+            key_iterable = list(key_iterable)
+            key_i = key_iterable.pop(0)
+            filtered = self.copy()
+            filtered[key_i] = filtered[key_i].filter(to_keep, *key_iterable)
+            return filtered
+        else:
+            filtered = {key: self[key] for key in to_keep}
+            filtered = list(filtered.values()) if self._type is list else filtered
+            return self.__class__(filtered)
 
     def get(self, *key_iterable):
         key_iterable = list(key_iterable)
@@ -26,40 +40,27 @@ class GetterMixin:
             return self.contents[key_i]
 
     def __getitem__(self, key):
-        # print(self)
-        # print(key)
-        if self.is_container(key):
+        if self.is_array(key) or is_slice(key):
+            item = self._index_with_array_or_slice(key)
+        elif self.is_container(key):
             item = self._index_with_container(key)
-        # Interpret indexing with list/dict as a container:
-        elif isinstance(key, (dict,list)):
+        # If given iterable, attempt to interpret it as an arraytainer:
+        elif isinstance(key, (dict, list, tuple)):
             key = self.__class__(key)
             item = self._index_with_container(key)
-        elif self.is_array(key):
-            item = self._index_with_array(key)
-        elif is_slice(key):
-            item = self._index_with_slices(key)
         else:
             item = self._index_with_hash(key)
         return item
 
-    def _index_with_container(self, key_container):
-        item = self.copy()
-        for container_key in self.keys():
-            array_key = key_container[container_key]  
-            item[container_key] = self.contents[container_key][self.array(array_key)]
-        return item
+    def _index_with_container(self, key_container):        
+        item = {key: self.contents[key][val] for key, val in key_container.items()}
+        item = list(item.values()) if self._type is list else item
+        return self.__class__(item)
 
-    def _index_with_array(self, array_key):
-        item = self.copy()
-        for container_key in self.keys():
-            item[container_key] = self.contents[container_key][self.array(array_key)]
-        return item
-
-    def _index_with_slices(self, slices):
-        item = self.copy()
-        for container_key in self.keys():
-            item[container_key] = self.contents[container_key][slices]
-        return item
+    def _index_with_array_or_slice(self, array_or_slice):
+        item = {key: self.contents[key][array_or_slice] for key in self.keys()}
+        item = list(item.values()) if self._type is list else item
+        return self.__class__(item)
 
     def _index_with_hash(self, key):
         try:
@@ -70,91 +71,50 @@ class GetterMixin:
             raise KeyError(' '.join(error_msg))
         return item
 
-def _attempt_append(contents, new_val):
-    try:
-        contents.append(new_val)
-    except AttributeError:
-        error_msg = ('Unable to append values to dictionary-like container;',
-                    "use 'my_arraytainer[new_key] = new_value' or the my_arraytainer.set method instead.")
-        raise AttributeError(' '.join(error_msg))
-
 class SetterMixin:
-    
-    def append(self, new_val, key_iterable=()):
+
+    def update(self, new_val, *key_iterable):
         if key_iterable:
             key_iterable = list(key_iterable)
             key_i = key_iterable.pop(0)
-            if key_iterable:
-                self[key_i].append(new_val, key_iterable)
+            self[key_i].update(new_val, *key_iterable)
+        else:
+            new_val = self.__class__(new_val)
+            if self._type is dict:
+                self.contents.update(new_val)
             else:
-                _attempt_append(self.contents[key_i], new_val)
-        else:
-            _attempt_append(self.contents, new_val) 
-
-    def set(self, new_val, *key_iterable):
-
-        if not key_iterable:
-            raise KeyError('Must specify at least one key when using the set method.')
-
-        # If key_iterable is provided by the user as a list/tuple:
-        if len(key_iterable) == 1 and isinstance(key_iterable[0], (tuple,list)):
-            key_iterable = key_iterable[0]
-            
-        key_iterable = list(key_iterable)
-        key_i = key_iterable.pop(0)
-
-        if key_iterable:
-            self[key_i].set(new_val, *key_iterable)
-        else:
-            try:
-                self[key_i] = new_val
-            except AttributeError:
-                error_msg = ("Unable to new assign items to a list-like container;",
-                             "use the append method instead.")
-                raise AttributeError(' '.join(error_msg))
+                self.contents.append(new_val)
 
     def __setitem__(self, key, new_value):
 
-        new_value = self._preprocess_set_new_value(new_value)
+        # Ensure new_value is either an arraytainer or an array:
+        if isinstance(new_value, Number):
+            new_value = self.array(new_value)
+        elif not self.is_array(new_value):
+            new_value = self.__class__(new_value) 
         
-        if self.is_container(key):
+        if self.is_array(key) or is_slice(key):
+            self._set_with_array_or_slice(key, new_value)
+        elif self.is_container(key):
             self._set_with_container(key, new_value)
         # Interpret indexing with list/dict as a container:
-        elif isinstance(key, (dict,list)):
+        elif isinstance(key, (dict, list, tuple)):
             key = self.__class__(key)
             item = self._set_with_container(key, new_value)
-        elif self.is_array(key):
-            self._set_with_array(key, new_value)
-        elif is_slice(key):
-            self._set_with_slices(key, new_value)
         else:
-            self._set_with_hash(key, new_value)    
+            self._set_with_hash(key, new_value) 
 
-    def _preprocess_set_new_value(self, new_val):
-        if isinstance(new_val, Number):
-            new_val = self.array(new_val)
-        elif not self.is_array(new_val):
-            new_val = self.__class__(new_val) 
-        return new_val
-
-    def _set_with_container(self, container_key, new_value):
-        for key in self.keys():
-            value_i = new_value[key] if self.is_container(new_value) else new_value
-            idx_i = container_key[key]
-            if self.is_array(self[key]):
-                self._set_array_item(key, idx_i, value_i)
+    def _set_with_container(self, key_container, new_value):
+        for key, val in key_container.items():
+            if self.is_array(self[key][val]):
+                self._set_array_item(key, val, new_value)
             else:
-                self[key][idx_i] = value_i
+                self[key][val] = new_value[key] if self.is_container(new_value) else new_value
 
-    def _set_with_array(self, array_key, new_value):
+    def _set_with_array_or_slice(self, array_or_slice, new_value):
         for container_key in self.keys():
             value_i = new_value[container_key] if self.is_container(new_value) else new_value
-            self._set_array_item(container_key, array_key, value_i)
-
-    def _set_with_slices(self, slices, new_value):
-        for container_key in self.keys():
-            value_i = new_value[container_key] if self.is_container(new_value) else new_value
-            self._set_array_item(container_key, slices, value_i)
+            self._set_array_item(container_key, array_or_slice, value_i)
 
     def _set_array_item(self, key, idx, value_i):
         error_msg = ('Cannot use array to set value with base Arraytainer class;', 
