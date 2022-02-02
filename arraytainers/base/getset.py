@@ -7,9 +7,6 @@ def is_slice(key):
     return is_tuple_of_slices or is_lone_slice
 
 class GetterMixin:
-    
-    def __iter__(self):
-        return ()
 
     def check_keys(self):
         slice_keys = [str(key) for key in self.keys() if is_slice(key)]

@@ -59,35 +59,6 @@ class Arraytainer(NDArrayOperatorsMixin, getset.GetterMixin, arrays.Mixin,
 
         return cls(new_contents)
 
-    # Generic methods:       
-    def __len__(self):
-        return len(self.contents)
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({repr(self.unpacked)})"
-
-    def copy(self):
-        return self.__class__(deepcopy(self.unpacked))
-
-    # Key/Item methods:
-    def keys(self):
-        if self._type is dict:
-            keys = (key for key in self.contents.keys())
-        else:
-            keys = (i for i in range(len(self.contents)))
-        return keys
-
-    def values(self, unpacked=False):
-        contents = self.unpacked if unpacked else self
-        return (contents[key] for key in self.keys())
-
-    def items(self, unpacked=False):
-        contents = self.unpacked if unpacked else self
-        return ((key, contents[key]) for key in self.keys())
-
-    def __iter__(self):
-        return self.values()
-
     # Type-checking methods:
     @classmethod
     def is_array(cls, val):

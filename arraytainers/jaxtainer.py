@@ -46,9 +46,10 @@ class Jaxtainer(Arraytainer):
 
       return output_container
     
-    # Removes 'out' from kwargs - not use by Jax methods:
+    # 
     def _prepare_kwargs(self, kwargs, key):
       kwargs = super()._prepare_kwargs(kwargs, key)
+      # Jax methods don't use 'out' keyword:
       kwargs.pop('out', None)
       return kwargs
 

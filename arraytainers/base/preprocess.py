@@ -3,6 +3,7 @@ from numbers import Number
 class Mixin:
   
   def _containerise_contents(self, convert_to_arrays):
+    
     for key, val in self.items():
       if isinstance(val, (list, tuple, dict)):
         self.contents[key] = self.__class__(val, convert_to_arrays=convert_to_arrays)
