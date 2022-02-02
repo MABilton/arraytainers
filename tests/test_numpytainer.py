@@ -1,10 +1,10 @@
 import numpy as np
-from arraytainers import Numpytainer
+from arraytainers import Arraytainer
 from main_tests.test_class import ArraytainerTests
 
 class TestNumpytainer(ArraytainerTests):
 
-    container_class = Numpytainer
+    container_class = Arraytainer
     array_constructor = np.array
     expected_array_types = (np.ndarray,)
 

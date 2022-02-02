@@ -1,6 +1,6 @@
 import warnings
-import more_itertools
 import copy
+import more_itertools
 
 class Contents:
 
@@ -14,16 +14,15 @@ class Contents:
         if cls is Contents:
             warnings.warn(f'Direct creation of {cls.__name__} class is not supported. '
                           'To avoid unexpected behaviour, create an Arraytainer or Jaxtainer object instead.')
-        return object.__new__(cls, *args, **kwargs)
+        return object.__new__(cls)
 
     def __init__(self, contents, nested=True):
-        self._type = dict if hasattr(self._contents, 'keys') else list
+        self._type = dict if hasattr(contents, 'keys') else list
         self._contents = self._preprocess_contents(contents)
         if nested:
             self._contents = self._nested_convert_to_contents()
 
-    @staticmethod
-    def _preprocess_contents(contents):
+    def _preprocess_contents(self, contents):
 
         if self._type is dict:
             self._check_keys(contents.keys())
@@ -36,7 +35,7 @@ class Contents:
         if isinstance(contents, tuple):
             contents = list(contents)
 
-        return copy.deepcopy(contents)
+        return self._deepcopy(contents)
 
     def _nested_convert_to_contents(self):
         for key, val in self.items():
@@ -44,11 +43,15 @@ class Contents:
                 self._contents[key] = self.__class__(val)
         return self._contents
 
-    @staticmethod
-    def _check_keys(keys):
+    def _check_keys(self, keys):
         for key in more_itertools.always_iterable(keys):
             if isinstance(key, tuple):
                 raise KeyError(f'The key {key} is a tuple, which are not allowed in {self.__class__.__name__}.')
+
+    # deepcopy changes jnp.array np.array, so Jaxtainer overload this method:
+    @staticmethod
+    def _deepcopy(contents):
+        return copy.deepcopy(contents)
 
     #
     #   Generic Methods

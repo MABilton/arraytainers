@@ -4,9 +4,9 @@ import jaxlib
 from copy import deepcopy
 from itertools import product
 from more_itertools import always_iterable
-from arraytainers import Numpytainer, Jaxtainer
+from arraytainers import Arraytainer, Jaxtainer
 
-ARRAYTAINER_TYPES = (Numpytainer, Jaxtainer)
+ARRAYTAINER_TYPES = (Arraytainer, Jaxtainer)
 ARRAY_TYPES = (np.ndarray, jnp.DeviceArray, jaxlib.xla_extension.DeviceArray)
 ARRAY_CONSTRUCTORS = (np.array, jnp.array)
 NONARRAY_TYPES = (dict, list, tuple)
@@ -119,7 +119,7 @@ def assert_same_types_recursive(arraytainer_1, arraytainer_2, container_class, c
 # Function to assert that to sets of unpacked contents are equal in value:
 def assert_equal_values(contents_1, contents_2, approx_equal=True):
   
-  inputs_are_arraytainers = [isinstance(x, (Numpytainer, Jaxtainer)) for x in (contents_1, contents_2)]
+  inputs_are_arraytainers = [isinstance(x, (Arraytainer, Jaxtainer)) for x in (contents_1, contents_2)]
 
   if any(inputs_are_arraytainers):
       raise TypeError('Must pass unpacked version of arraytainer to assert_equal_values.')

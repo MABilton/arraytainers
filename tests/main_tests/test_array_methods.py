@@ -13,7 +13,7 @@ class ArrayMixin:
         
         std_contents, std_shapes = std_contents_and_shapes
         arraytainer = self.container_class(std_contents)
-        shapes_arraytainer = self.container_class(std_shapes, greedy_array_conversion=True)
+        shapes_arraytainer = self.container_class(std_shapes, greedy=True)
 
         for order in ('C', 'F'):
             # Flatten individual vectors within contents structure:
@@ -61,7 +61,7 @@ class ArrayMixin:
 
         arraytainer = self.container_class(in_contents)
 
-        expected = self.container_class(shapes, greedy_array_conversion=True)
+        expected = self.container_class(shapes, greedy=True)
         result = arraytainer.shape
 
         utils.assert_equal_values(result.unpacked, expected.unpacked)
@@ -160,7 +160,7 @@ class ArrayMixin:
                                                        index_args_fun=index_args_fun, throw_exception=True)
             # Convert new_shape to container AFTER computing expected result, since utils.apply_func_to_contents
             # does not accept arraytainers as inputs:
-            new_shape = self.container_class(new_shape, greedy_array_conversion=True) if new_shape_type=='arraytainer' else new_shape
+            new_shape = self.container_class(new_shape, greedy=True) if new_shape_type=='arraytainer' else new_shape
             result = arraytainer.reshape(new_shape)
             utils.assert_equal_values(result.unpacked, expected)
             utils.assert_same_types(result, self.container_class(expected))
@@ -173,7 +173,7 @@ class ArrayMixin:
                 utils.assert_same_types(result_2, self.container_class(expected))
 
         else:
-            new_shape = self.container_class(new_shape, greedy_array_conversion=True) if new_shape_type=='arraytainer' else new_shape
+            new_shape = self.container_class(new_shape, greedy=True) if new_shape_type=='arraytainer' else new_shape
             self.assert_exception(reshape_func, exception, arraytainer, new_shape)
 
     ARRAY_CONVERSION_TEST_CASES = {

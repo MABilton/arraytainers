@@ -1,6 +1,6 @@
-
 from ._contents import Contents
 import numpy as np
+import more_itertools
 
 class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
 
@@ -58,8 +58,11 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         return np.array(val)
 
     def _convert_contents_to_arrays(self, contents, greedy, initial=True):
-        
+
         contents = self._unpack_if_arraytainer(contents)
+        if isinstance(contents, tuple):
+            contents = list(contents)
+
         contents_iter = contents.items() if isinstance(contents, dict) else enumerate(contents)
 
         for key, val in contents_iter:
@@ -83,7 +86,6 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
 
             else:
                 contents[key] = self._convert_to_array(val)
-            
         return contents
 
     @staticmethod
@@ -93,12 +95,12 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         return val
 
     @staticmethod
-    def _is_scalar_array(val)
+    def _is_scalar_array(val):
         return not val.shape
 
     def _can_combine_list_into_single_array(self, contents_list):
 
-        elem_is_array = [isinstance(val_i, self._arrays) for val_i in contents[key]]
+        elem_is_array = [isinstance(val_i, self._arrays) for val_i in contents_list]
 
         if all(elem_is_array):
             first_array_len = len(contents_list[0])
@@ -128,8 +130,6 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         if self._type is list:
             item = list(item.values())
         return self.__class__(item)
-    
-
 
     #
     #   Setter Methods
@@ -200,7 +200,8 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         return sum(self.list_elements())
 
     def sum_all(self):
-        return np.sum(self.sum_arrays)
+        arraytainer_of_scalars = np.sum(self)
+        return sum(arraytainer_of_scalars.list_elements())
 
     def get_shape(self, return_tuples=False):
         
@@ -220,14 +221,21 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
     def shape(self):
         return self.get_shape()
 
+    @property
+    def ndim(self):
+        return np.ndim(self)
+
     def reshape(self, *new_shapes, order='C'):
 
         new_shapes = list(new_shapes)
 
         for idx, shape in enumerate(new_shapes):
             if not isinstance(shape, (Arraytainer, *self._arrays)):
-                new_shapes[idx] = self._convert_to_array(shape)
-
+                shape = self._convert_to_array(shape)
+                # Shape arrays must have at least one dimension for concatenate:
+                if shape.ndim == 0:
+                    shape = shape[None]
+                new_shapes[idx] = shape
         new_shapes = np.concatenate(new_shapes)
 
         if len(new_shapes)==1 and isinstance(new_shapes[0], (Arraytainer, tuple)):
@@ -253,11 +261,10 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         fun_return = self._manage_func_call(ufunc, method, *args, **kwargs)
         return fun_return
 
-    def _manage_function_call(self, func, types, *args, **kwargs):
+    def _manage_func_call(self, func, types, *args, **kwargs):
 
         func_return = {}
-
-        arraytainer_list = self._find_arraytainers_in_args(args, kwargs)
+        arraytainer_list = self._list_arraytainers_in_args(args) + self._list_arraytainers_in_args(kwargs)
         largest_arraytainer = self._find_largest_arraytainer(arraytainer_list)
         self._check_arraytainer_arg_compatability(arraytainer_list, largest_arraytainer)
 
@@ -272,10 +279,19 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         return self.__class__(func_return)
 
     @staticmethod
-    def _find_arraytainers_in_args(args, kwargs):
-        arg_arraytainers =  [arg_i for arg_i in args if isinstance(arg_i, Arraytainer)]
-        kwarg_arraytainers = [val_i for val_i in kwargs.values() if isinstance(val_i, Arraytainer)]
-        return arg_arraytainers + kwarg_arraytainers
+    def _list_arraytainers_in_args(args):
+        args_iter = args.values() if isinstance(args, dict) else args
+        args_arraytainers = []
+        for arg_i in args_iter:
+            if isinstance(arg_i, Arraytainer):
+                args_arraytainers.append(arg_i)
+            # Could have an arraytainer in a list in a tuple (e.g. np.concatenate):
+            elif isinstance(arg_i, (list, tuple, dict)):
+                # print('a')
+                args_arraytainers += Arraytainer._list_arraytainers_in_args(arg_i)
+                # print('b')
+        
+        return args_arraytainers
 
     @staticmethod
     def _find_largest_arraytainer(arraytainer_list):
@@ -304,17 +320,17 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
     @staticmethod
     def _prepare_func_args(args, key):
         
-        args_iter = args.keys() if isinstance(args, dict) else enumerate(args)
+        args_iter = args.items() if isinstance(args, dict) else enumerate(args)
         
         prepped_args = {}
         for arg_key, arg in args_iter:
             if isinstance(arg, Arraytainer):
                 # Skip over this arg if doesn't include key:
                 if key in arg.keys():
-                    new_args.append(arg_i[key])
+                    prepped_args[arg_key]  = arg[key]
             # Tuple args may contain arryatainer entries:
-            elif isinstance(arg, tuple):
-                prepped_args[key] = Arraytainer._prepare_args(arg, arg_key)
+            elif isinstance(arg, (tuple, list, dict)):
+                prepped_args[arg_key] = Arraytainer._prepare_func_args(arg, key)
             else:
                 prepped_args[arg_key] = arg
 

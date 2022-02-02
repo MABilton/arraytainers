@@ -1,87 +1,110 @@
+from .arraytainer import Arraytainer
 import numpy as np
+import jax
 import jax.numpy as jnp
-from jax.tree_util import register_pytree_node_class, tree_flatten, tree_unflatten
-from .base.base import Arraytainer
+from jax.tree_util import register_pytree_node_class
 
 @register_pytree_node_class
 class Jaxtainer(Arraytainer):
 
-    array_type = jnp.DeviceArray
+    _arrays = (np.ndarray, jnp.ndarray)
+    _jnp_submodules_to_search = ('', 'linalg', 'fft')
 
-    # May want only floats stored for autograd purposes:    
-    def __init__(self, contents, convert_to_arrays=True, greedy_array_conversion=False, floats_only=False, _containerise_contents=True):
+    def __init__(self, contents, convert_arrays=True, greedy=False, floats_only=False, nested=True):
+        self.floats_only = floats_only
+        super().__init__(contents, convert_arrays, greedy, nested)
 
-        self.array_class = (lambda x : jnp.array(x).astype(float)) if floats_only else jnp.array
+    #
+    #   Array Methods (Replaces Arraytainer methods)
+    #
 
-        super().__init__(contents)
+    def _deepcopy(self, contents):
+        copied_contents = contents.copy()
+        contents_iter = contents.items() if isinstance(contents, dict) else enumerate(contents)
+        for key, val in contents_iter:
+            if isinstance(val, self._arrays):
+                copied_contents[key] = val
+            elif isinstance(val, (list, dict, tuple)):
+                copied_contents = self._deepcopy(val)
+            else:
+                copied_contents[key] = val.copy() 
+        return copied_contents
 
-        if convert_to_arrays:
-          self._convert_contents_to_arrays(greedy_array_conversion)
-        if _containerise_contents:
-          self._containerise_contents(convert_to_arrays)
+    def _set_array_val(self, key, idx, value):
+        self._contents[key] = self.contents[key].at[idx].set(value)
 
-    # Over-rided method definitions:
-    def _manage_function_call(self, func, types, *args, **kwargs):
+    def _convert_to_array(self, val):
+        array = jnp.array(val)
+        if self.floats_only:
+            array = array.astype(float)   
+        return array
 
-      output_dict = {}
+    #
+    #   Numpy Function Handling Methods (Replaces Arraytainer methods)
+    #
 
-      self._check_container_compatability(args, kwargs)
+    def _manage_func_call(self, func, types, *args, **kwargs):
 
-      for key in self.keys():
-        args_i = self._prepare_args(args, key)
-        kwargs_i = self._prepare_kwargs(kwargs, key)
+        func_return = {}
+
+        arraytainer_list = self._list_arraytainers_in_args(args) + self._list_arraytainers_in_args(kwargs)
+        largest_arraytainer = self._find_largest_arraytainer(arraytainer_list)
+        self._check_arraytainer_arg_compatability(arraytainer_list, largest_arraytainer)
+
+        for key in largest_arraytainer.keys():
+            
+            args_i = self._prepare_func_args(args, key)
+            kwargs_i = self._prepare_func_args(kwargs, key)
+            arraytainer_list_i = self._list_arraytainers_in_args(args_i) + self._list_arraytainers_in_args(kwargs_i)
+
+            # Need to call Numpy method for recursion on Arraytainer arguments:
+            method = self._find_jnp_method(func) if not arraytainer_list_i else func
+            func_return[key] = method(*args_i, **kwargs_i)
+
+        if self._type is list:
+            func_return = list(func_return.values())
+
+        return self.__class__(func_return)
         
-        # Check to see if args or kwargs contains a container type:
-        includes_containers = self._find_containers(args_i, kwargs_i)
+    def _prepare_func_args(self, args, key):
+        prepped_args = super()._prepare_func_args(args, key)
+        # Jax methods don't use 'out' keyword in kwargs:
+        if isinstance(prepped_args, dict):
+            prepped_args.pop('out', None)
+        return prepped_args
 
-        # If function call does not include containers, we need to remove any 'out' kwargs:
-        method = find_method(jnp, func) if not includes_containers else find_method(np, func)
-        output_dict[key] = method(*args_i, **kwargs_i)
+    def _find_jnp_method(self, func):
 
-      if self._type is list:
-        output_list = list(output_dict.values())
-        output_container = self.__class__(output_list)
-      else:
-        output_container = self.__class__(output_dict)
+        method_name = str(func.__name__)
 
-      return output_container
-    
-    # 
-    def _prepare_kwargs(self, kwargs, key):
-      kwargs = super()._prepare_kwargs(kwargs, key)
-      # Jax methods don't use 'out' keyword:
-      kwargs.pop('out', None)
-      return kwargs
+        for i, submod_name in enumerate(self._jnp_submodules_to_search):
 
-    def _find_containers(self, args, kwargs):
-      containers_in_args = [self.is_container(arg_i) for arg_i in args]
-      containers_in_kwargs = [self.is_container(arg_i) for arg_i in kwargs.values()]
-      includes_containers = any(containers_in_args) or any(containers_in_kwargs)
-      return includes_containers
+            if submod_name != "":
+                submodule = getattr(jnp, submod_name)
+            else:
+                submodule = jnp
 
-    # Functions required by @register_pytree_node_class decorator:
+            if hasattr(submodule, method_name):
+                found_method = getattr(submodule, method_name)
+                break
+            elif i == len(self._jnp_submodules_to_search)-1:
+                raise AttributeError(f'The {method_name} method is not implemented in jax.numpy.')
+
+        return found_method
+
+    #
+    #   Jax Tree Methods
+    #
+
     def tree_flatten(self):
-      return tree_flatten(self.unpacked)
+        return jax.tree_util.tree_flatten(self.unpacked)
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
-      try:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=True, _containerise_contents=True)
-      except TypeError:
-        unflattened = cls(tree_unflatten(aux_data, children), convert_to_arrays=False, _containerise_contents=False)
-      return unflattened
-    
-    def _set_array_item(self, key, idx, value):
-      self.contents[key] = self.contents[key].at[idx].set(value)
-
-def find_method(module, func, submodule_to_search=('', 'linalg', 'fft')):
-    method_name = str(func.__name__)
-    modules_to_search = [getattr(module, submodule, module) for submodule in submodule_to_search]
-    for i, mod in enumerate(modules_to_search):
-      try:
-          found_method = getattr(mod, method_name)
-          break
-      except AttributeError:
-          if i == len(submodule_to_search)-1:
-            raise AttributeError(f'The {method_name} method is not implemented in {module}.')
-    return found_method
+        try:
+            unflattened = \
+                cls(jax.tree_util.tree_unflatten(aux_data, children), convert_arrays=True, nested=True)
+        except TypeError:
+            unflattened = \
+                cls(jax.tree_util.tree_unflatten(aux_data, children), convert_arrays=False, nested=False)
+        return unflattened
