@@ -1,4 +1,5 @@
 from ._contents import Contents
+import numbers
 import numpy as np
 import more_itertools
 
@@ -11,13 +12,20 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
     #
 
     def __init__(self, contents, convert_arrays=True, greedy=False, nested=True):
+        
+        # All arraytainers must minimally comprise of a list:
+        if not isinstance(contents, (list, dict, tuple, Arraytainer)):
+            contents = [contents]
+            # To prevent array converter converting outer list to array:
+            greedy=True
+
         if convert_arrays:
             contents = self._convert_contents_to_arrays(contents, greedy)
-        super().__init__(contents, nested)
-    
+
+        super().__init__(contents, nested, greedy=greedy) #convert_arrays=convert_arrays
 
     @classmethod
-    def from_array(cls, array, shapes, order='C'):
+    def from_array(cls, array, shapes, order='C', convert_arrays=True, greedy=False, nested=True):
 
         vector = array.flatten(order=order).tolist()
         if not isinstance(shapes, Arraytainer):
@@ -25,20 +33,22 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
 
         contents = cls._create_contents_from_vector(vector, shapes, order)
 
-        return cls(contents)
+        return cls(contents, convert_arrays, greedy, nested)
 
     @classmethod
-    def _create_contents_from_vector(cls, vector, shapes, order, output=None):
+    def _create_contents_from_vector(cls, vector, shapes, order):
 
-        if output is None:
-            output = shapes.copy().unpack()
+        output = {}
 
         for key, shape in shapes.items():
             if isinstance(shape, Arraytainer):
-                output[key] = cls._create_contents_from_vector(vector, shape, order, output=output[key])
+                output[key] = cls._create_contents_from_vector(vector, shape, order)
             else:
                 array_vals = cls._extract_array_vals(vector, shape)
                 output[key] = array_vals.reshape(shape, order=order)
+
+        if shapes._type is list:
+            output = list(output.values())
 
         return output
  
@@ -57,7 +67,7 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         # Note that Jaxtainer uses jnp.array:
         return np.array(val)
 
-    def _convert_contents_to_arrays(self, contents, greedy, initial=True):
+    def _convert_contents_to_arrays(self, contents, greedy):
 
         contents = self._unpack_if_arraytainer(contents)
         if isinstance(contents, tuple):
@@ -66,26 +76,30 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         contents_iter = contents.items() if isinstance(contents, dict) else enumerate(contents)
 
         for key, val in contents_iter:
-
             val = self._unpack_if_arraytainer(val)
-            
+
             if isinstance(val, dict):
                 contents[key] = self._convert_contents_to_arrays(val, greedy)
 
             elif isinstance(val, (list, tuple)):
+                
+                # Check before altering contents on val:
+                any_arrays_in_val = any(isinstance(val_i, self._arrays) for val_i in val)
 
-                converted_vals = self._convert_contents_to_arrays(val, greedy)
-
-                if all(self._is_scalar_array(val) for val in converted_vals):
-                    converted_vals = self._convert_to_array(converted_vals)
-
-                if greedy and self._can_combine_list_into_single_array(converted_vals):
+                # List of numbers should be directly converted to an array:
+                if all(isinstance(val_i, numbers.Number) for val_i in val):
+                    converted_vals = self._convert_to_array(val)
+                else:
+                    converted_vals = self._convert_contents_to_arrays(val, greedy)
+            
+                if not greedy and self._can_combine_list_into_single_array(converted_vals, any_arrays_in_val):
                     converted_vals = self._convert_to_array(converted_vals)
 
                 contents[key] = converted_vals
 
             else:
                 contents[key] = self._convert_to_array(val)
+
         return contents
 
     @staticmethod
@@ -94,25 +108,18 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
             val = val.unpack()
         return val
 
-    @staticmethod
-    def _is_scalar_array(val):
-        return not val.shape
-
-    def _can_combine_list_into_single_array(self, contents_list):
-
-        elem_is_array = [isinstance(val_i, self._arrays) for val_i in contents_list]
-
-        if all(elem_is_array):
-            first_array_len = len(contents_list[0])
-            is_equal_length = [len(array_i) == first_array_len for array_i in contents_list]
-            if all(is_equal_length):
-                can_convert = True
-            else:
-                can_convert = False
-        else:
-            can_convert = False
-        
+    def _can_combine_list_into_single_array(self, converted_list, any_arrays_in_val):
+        can_convert = not any_arrays_in_val and \
+                      self._all_elems_are_arrays(converted_list) and \
+                      self._all_arrays_of_equal_shape(converted_list)
         return can_convert
+
+    def _all_elems_are_arrays(self, converted_list):
+        return all(isinstance(val_i, self._arrays) for val_i in converted_list)
+
+    def _all_arrays_of_equal_shape(self, converted_list):
+        first_array_shape = converted_list[0].shape
+        return all(array_i.shape == first_array_shape for array_i in converted_list)
 
     #
     #   Getter Methods
@@ -122,14 +129,14 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         if isinstance(key, self._arrays) or self._is_slice(key):
             item = self._get_with_array(key)
         else:
-            item = super().__getitem__(key)
+            item = super().__getitem__(key, greedy=True)
         return item
     
     def _get_with_array(self, array_key):
         item = {key: self._contents[key][array_key] for key in self.keys()}
         if self._type is list:
             item = list(item.values())
-        return self.__class__(item)
+        return self.__class__(item, greedy=True)
 
     #
     #   Setter Methods
@@ -244,7 +251,7 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         return np.reshape(self, new_shapes, order=order)
 
     def flatten(self, order='C', return_array=True):
-        output = np.ravel(self, order=order)
+        output = np.squeeze(np.ravel(self, order=order))
         if return_array:
             output = np.concatenate(output.list_elements())
         return output
@@ -276,7 +283,7 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         if self._type is list:
             func_return = list(func_return.values())
 
-        return self.__class__(func_return)
+        return self.__class__(func_return, greedy=True)
 
     @staticmethod
     def _list_arraytainers_in_args(args):
@@ -287,9 +294,7 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
                 args_arraytainers.append(arg_i)
             # Could have an arraytainer in a list in a tuple (e.g. np.concatenate):
             elif isinstance(arg_i, (list, tuple, dict)):
-                # print('a')
                 args_arraytainers += Arraytainer._list_arraytainers_in_args(arg_i)
-                # print('b')
         
         return args_arraytainers
 

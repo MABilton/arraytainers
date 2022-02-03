@@ -21,15 +21,15 @@ class IndexMixin:
                                                                   ids=utils.unpack_test_ids(GET_TEST_CASES),
                                                                   indirect=['contents'])
     def test_get_method(self, contents, key_iterable, exception):
-        arraytainer = self.container_class(contents)
+        arraytainer = self.container_class(contents, greedy=True)
 
         if exception is None:
             result = arraytainer.get(*key_iterable)
             expected = utils.get_contents_item(contents, key_iterable)
             result_val_check = result.unpacked if utils.is_arraytainer(result) else result
             utils.assert_equal_values(result_val_check, expected)
-            result_type_check = result if utils.is_arraytainer(result) else self.container_class(result)
-            utils.assert_same_types(result_type_check, self.container_class(expected))
+            result_type_check = result if utils.is_arraytainer(result) else self.container_class(result, greedy=True)
+            utils.assert_same_types(result_type_check, self.container_class(expected, greedy=True))
         else:
             self.assert_exception(lambda x, key_iterable: x.get(*key_iterable), exception, arraytainer, key_iterable)
 
@@ -77,7 +77,7 @@ class IndexMixin:
                                                               indirect=['contents'])
     def test_indexing_with_slice(self, contents, slice_val, exception):
 
-        arraytainer = self.container_class(contents)
+        arraytainer = self.container_class(contents, greedy=True)
 
         def index_func(contents):
             result = contents[slice_val]
@@ -92,7 +92,7 @@ class IndexMixin:
             result = arraytainer[slice_val]
             expected, _ = utils.apply_func_to_contents(contents, func=index_func, throw_exception=True)
             utils.assert_equal_values(result.unpacked, expected)
-            utils.assert_same_types(result, self.container_class(expected))
+            utils.assert_same_types(result, self.container_class(expected, greedy=True))
         else:
             self.assert_exception(lambda x, key: x[key], exception, arraytainer, slice_val)
 
@@ -111,13 +111,13 @@ class IndexMixin:
                                                            ids=utils.unpack_test_ids(INDEX_ARRAY_TEST_CASES),
                                                            indirect=['contents', 'array'])
     def test_indexing_with_array(self, contents, array, exception):
-        arraytainer = self.container_class(contents)
+        arraytainer = self.container_class(contents, greedy=True)
         index_func = lambda contents : contents[array]
         if exception is None:
             expected, _ = utils.apply_func_to_contents(contents, func=index_func, throw_exception=True)
             result = arraytainer[array]
             utils.assert_equal_values(result.unpacked, expected)
-            utils.assert_same_types(result, self.container_class(expected))
+            utils.assert_same_types(result, self.container_class(expected, greedy=True))
         else:
             self.assert_exception(index_func, exception, arraytainer)
 
@@ -146,15 +146,15 @@ class IndexMixin:
                                 ( {'a':np.array([[False,True],[True,True]]), 
                                   'b':[np.array([True,False,True]), {'c': np.array([True,False,False]), 
                                   'd': np.array([True,False,True])}]}, None ),
-                                ({'a':[np.array([False,True])],'b':np.array([True,False,True,True])}, 'key_error') ) )
+                                ( {'a':[np.array([False,True])],'b':np.array([True,False,True,True])}, 'key_error') ) )
     }
     @pytest.mark.parametrize('contents, index_contents, exception', utils.unpack_test_cases(INDEX_CONTENTS_TEST_CASES), 
                                                                     ids=utils.unpack_test_ids(INDEX_CONTENTS_TEST_CASES),
                                                                     indirect=['contents'])
     def test_indexing_with_arraytainer(self, contents, index_contents, exception):
 
-        arraytainer = self.container_class(contents)
-        index_arraytainer = self.container_class(index_contents)
+        arraytainer = self.container_class(contents, greedy=True)
+        index_arraytainer = self.container_class(index_contents, greedy=True)
 
         # For case of Jaxtainer, check that index contents correctly converted to Jax arrays:
         if 'jax' in self.container_class.__name__.lower():
@@ -171,14 +171,10 @@ class IndexMixin:
             index_args_fun = lambda args, idx : (args[0][idx],) if not utils.is_array(args[0]) else args
             expected, _ =  utils.apply_func_to_contents(contents, func=index_func, args=(index_contents,), 
                                                         index_args_fun=index_args_fun, throw_exception=True)
-            # First try indexing with contents NOT converted to arraytainer - should work same as arraytainer:
-            result_1 = arraytainer[index_contents]
-            utils.assert_equal_values(expected, result_1.unpacked)
-            utils.assert_same_types(self.container_class(expected), result_1)
             # Next try indexing with arraytainer version of contents:
             result_2 = arraytainer[index_arraytainer]
             utils.assert_equal_values(expected, result_2.unpacked)
-            utils.assert_same_types(self.container_class(expected), result_2)
+            utils.assert_same_types(self.container_class(expected, greedy=True), result_2)
         else:
             self.assert_exception(index_func, exception, arraytainer, index_contents)
             self.assert_exception(index_func, exception, arraytainer, index_arraytainer)

@@ -36,15 +36,15 @@ class ArrayMixin:
                 # as a list/dict AND when provided as an arraytainer:
                 vector = deepcopy(expected)
                 for shape in (std_shapes, shapes_arraytainer):
-                    result = self.container_class.from_vector(vector, shape, order=order)
+                    result = self.container_class.from_array(vector, shape, order=order)
                     utils.assert_equal_values(std_contents, result.unpacked)
                     utils.assert_same_types(arraytainer, result)
             except ValueError as exception:
                 self.assert_exception(lambda x: x.flatten(order=order), exception, arraytainer)
 
     def test_arraytainer_composition(self, std_contents):
-        arraytainer = self.container_class(std_contents)
-        arraytainer_2 = self.container_class(arraytainer)
+        arraytainer = self.container_class(std_contents, greedy=True)
+        arraytainer_2 = self.container_class(arraytainer, greedy=True)
         utils.assert_equal_values(arraytainer.unpacked, arraytainer_2.unpacked)
         utils.assert_same_types(arraytainer, arraytainer_2)
 
@@ -59,7 +59,7 @@ class ArrayMixin:
 
         in_contents, shapes = std_contents_and_shapes
 
-        arraytainer = self.container_class(in_contents)
+        arraytainer = self.container_class(in_contents, greedy=True)
 
         expected = self.container_class(shapes, greedy=True)
         result = arraytainer.shape
@@ -150,7 +150,7 @@ class ArrayMixin:
     def test_reshape(self, contents, new_shape, exception, new_shape_type):
         
         new_shape = deepcopy(new_shape)
-        arraytainer = self.container_class(contents)
+        arraytainer = self.container_class(contents, greedy=True)
         
         reshape_func = lambda x, new_shape: x.reshape(new_shape)
 
@@ -163,14 +163,14 @@ class ArrayMixin:
             new_shape = self.container_class(new_shape, greedy=True) if new_shape_type=='arraytainer' else new_shape
             result = arraytainer.reshape(new_shape)
             utils.assert_equal_values(result.unpacked, expected)
-            utils.assert_same_types(result, self.container_class(expected))
+            utils.assert_same_types(result, self.container_class(expected, greedy=True))
             
             # If using a tuple to reshape, 
             if new_shape_type=='tuple':
                 arraytainer_2 = self.container_class(contents)
                 result_2 = arraytainer.reshape(*new_shape)
                 utils.assert_equal_values(result_2.unpacked, expected)
-                utils.assert_same_types(result_2, self.container_class(expected))
+                utils.assert_same_types(result_2, self.container_class(expected, greedy=True))
 
         else:
             new_shape = self.container_class(new_shape, greedy=True) if new_shape_type=='arraytainer' else new_shape
@@ -195,6 +195,8 @@ class ArrayMixin:
     @pytest.mark.parametrize('contents_in, expected', utils.unpack_test_cases(ARRAY_CONVERSION_TEST_CASES), 
                                                       ids=utils.unpack_test_ids(ARRAY_CONVERSION_TEST_CASES))
     def test_convert_list_to_array(self, contents_in, expected):
+        contents_in = deepcopy(contents_in)
+        expected = deepcopy(expected)
         arraytainer = self.container_class(contents_in)
         utils.assert_equal_values(arraytainer.unpacked, expected)
         utils.assert_same_types(arraytainer, self.container_class(expected))
@@ -209,9 +211,6 @@ class ArrayMixin:
                                     [[(3,3)],[(3,3)]], 
                                     [(3,1),[(3,3),(3,3)]], 
                                     [[(3,1)],[[[(3,1)]]]] ), None ),
-    'list_key_error': cartesian_prod( ( [[(3,2)],[(3,3), (3,3)]], 
-                                        [[(3,3)],[[(3,3)], (3,3)]], 
-                                        [[(3,3), (3,3)],[(3,3), (3,3), (3,3)]] ), 'key_error' ),
     'list_broadcasting_error': cartesian_prod( ( [(3,3),(3,2)], 
                                                 [(3,2),[(3,3),(3,3)]] ), 'broadcast_error' ),
     'dict_working': cartesian_prod( ( {'a':(1,3),'b':(3,3)}, 
@@ -228,10 +227,7 @@ class ArrayMixin:
                                     {'a':[(3,3),(3,3)],'b':[[(3,3)],{'c':(3,3)}]} ), None ),
     'mixed_broadcasting_error': cartesian_prod( ( {'b':[(2,3),{'c':(3,3)}],'c':(3,3)}, 
                                                 {'a':[(2,3),(3,3)],'b':[[(3,3)],{'c':(3,3)}]} ), 'broadcast_error' ),
-    'mixed_key_error': cartesian_prod( ( [{'a':[(3,1), (3,1)]}, {'a':[(3,1)]}], 
-                                        [{'a':[(3,1)]}, {'b':[(3,1)]}], 
-                                        {'a':[(3,3),(3,3)],'b':[{'c':(3,3)}]}, 
-                                        {'a':[(3,3)],'b':{'c':(3,3)}} ), 'key_error' )
+    'mixed_key_error': cartesian_prod( ( [{'a':[(3,1)]}, {'b':[(3,1)]}] ), 'key_error' )
     }
     @pytest.mark.parametrize('contents, exception', utils.unpack_test_cases(SUM_ELEMENTS_TEST_CASES), 
                                                     ids=utils.unpack_test_ids(SUM_ELEMENTS_TEST_CASES),
@@ -244,16 +240,18 @@ class ArrayMixin:
             expected = utils.sum_elements(contents)
             # If expected is not a list or array, we need to 'package' it as a list, since
             # arraytainers will automatically place 'lone' entries in a list:
-            expected = [expected] if not isinstance(expected,(list,dict)) else expected
-            result = arraytainer.sum_elements()
+            result = arraytainer.sum()
             # For comparisons, need to 'unpack' sum_result if it's an arraytainer:
             try:
-                utils.assert_equal_values(result.unpacked, expected)
-                utils.assert_same_types(result, self.container_class(expected))
-            except:
-                raise Exception
+                if utils.is_arraytainer(result): 
+                    utils.assert_equal_values(result.unpacked, expected)
+                    utils.assert_same_types(result, self.container_class(expected))
+                else:
+                    utils.assert_equal_values(result, expected)
+            except Exception as e:
+                raise e
         else:
-            self.assert_exception(lambda x: x.sum_elements(), exception, arraytainer)
+            self.assert_exception(lambda x: x.sum(), exception, arraytainer)
 
     SUM_ARRAYS_TEST_CASES = {
     'empty': cartesian_prod( ( [], {} ) , None ),
@@ -285,6 +283,6 @@ class ArrayMixin:
             expected = sum(array_list)
             result = arraytainer.sum_arrays()
             assert np.allclose(result, expected)
-            assert utils.is_array(result)
+            assert utils.is_array(result) or result==0
         else:
             self.assert_exception(lambda x: x.sum_arrays(), exception, arraytainer)

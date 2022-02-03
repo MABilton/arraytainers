@@ -7,7 +7,7 @@ from jax.tree_util import register_pytree_node_class
 @register_pytree_node_class
 class Jaxtainer(Arraytainer):
 
-    _arrays = (np.ndarray, jnp.ndarray)
+    _arrays = (np.ndarray, jnp.DeviceArray)
     _jnp_submodules_to_search = ('', 'linalg', 'fft')
 
     def __init__(self, contents, convert_arrays=True, greedy=False, floats_only=False, nested=True):
@@ -15,7 +15,7 @@ class Jaxtainer(Arraytainer):
         super().__init__(contents, convert_arrays, greedy, nested)
 
     #
-    #   Array Methods (Replaces Arraytainer methods)
+    #   Array Methods (Overrides Arraytainer methods)
     #
 
     def _deepcopy(self, contents):
@@ -25,7 +25,7 @@ class Jaxtainer(Arraytainer):
             if isinstance(val, self._arrays):
                 copied_contents[key] = val
             elif isinstance(val, (list, dict, tuple)):
-                copied_contents = self._deepcopy(val)
+                copied_contents[key] = self._deepcopy(val)
             else:
                 copied_contents[key] = val.copy() 
         return copied_contents
@@ -39,8 +39,13 @@ class Jaxtainer(Arraytainer):
             array = array.astype(float)   
         return array
 
+    @staticmethod
+    def _extract_array_vals(vector, shape):
+        num_elem = jnp.prod(shape)
+        return jnp.array([vector.pop(0) for _ in range(num_elem)])
+
     #
-    #   Numpy Function Handling Methods (Replaces Arraytainer methods)
+    #   Numpy Function Handling Methods (Overrides Arraytainer methods)
     #
 
     def _manage_func_call(self, func, types, *args, **kwargs):
@@ -64,7 +69,7 @@ class Jaxtainer(Arraytainer):
         if self._type is list:
             func_return = list(func_return.values())
 
-        return self.__class__(func_return)
+        return self.__class__(func_return, greedy=True)
         
     def _prepare_func_args(self, args, key):
         prepped_args = super()._prepare_func_args(args, key)

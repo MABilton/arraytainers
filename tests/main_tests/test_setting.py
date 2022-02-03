@@ -26,7 +26,7 @@ class SetMixin:
     def test_independence(self, contents_list, key_iterable):
         contents, new_val = contents_list
         contents_copy = deepcopy(contents)
-        arraytainer = self.container_class(contents_copy)
+        arraytainer = self.container_class(contents_copy, greedy=True)
         # After changing the value of contents, arraytainer should remain the same - ie the values
         # stored in the arraytainer should be independent of the initial contents used to create it
         utils.set_contents_item(contents_copy, key_iterable, new_val)

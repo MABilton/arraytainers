@@ -16,15 +16,14 @@ class Contents:
                           'To avoid unexpected behaviour, create an Arraytainer or Jaxtainer object instead.')
         return object.__new__(cls)
 
-    def __init__(self, contents, nested=True):
-        self._type = dict if hasattr(contents, 'keys') else list
+    def __init__(self, contents, nested=True, **kwargs):
         self._contents = self._preprocess_contents(contents)
         if nested:
-            self._contents = self._nested_convert_to_contents()
+            self._nested_convert_to_contents(kwargs)
 
     def _preprocess_contents(self, contents):
 
-        if self._type is dict:
+        if self._get_contents_type(contents) is dict:
             self._check_keys(contents.keys())
 
         if isinstance(contents, Contents):
@@ -37,25 +36,27 @@ class Contents:
 
         return self._deepcopy(contents)
 
-    def _nested_convert_to_contents(self):
+    def _nested_convert_to_contents(self, kwargs):
         for key, val in self.items():
             if isinstance(val, self._convert_to_contents):
-                self._contents[key] = self.__class__(val)
-        return self._contents
+                self._contents[key] = self.__class__(val, **kwargs)
 
     def _check_keys(self, keys):
         for key in more_itertools.always_iterable(keys):
             if isinstance(key, tuple):
                 raise KeyError(f'The key {key} is a tuple, which are not allowed in {self.__class__.__name__}.')
 
-    # deepcopy changes jnp.array np.array, so Jaxtainer overload this method:
-    @staticmethod
-    def _deepcopy(contents):
-        return copy.deepcopy(contents)
-
     #
     #   Generic Methods
     #
+
+    @staticmethod
+    def _get_contents_type(val):
+        return dict if hasattr(val, 'keys') else list
+
+    @property
+    def _type(self):
+        return self._get_contents_type(self._contents)
 
     def __len__(self):
         return len(self._contents)
@@ -63,8 +64,13 @@ class Contents:
     def __repr__(self):
         return f"{self.__class__.__name__}({repr(self.unpack())})"
 
+    # deepcopy changes jnp.array np.array, so Jaxtainer overload this method:
+    @staticmethod
+    def _deepcopy(contents):
+        return copy.deepcopy(contents)
+
     def copy(self):
-        return self.__class__(copy.deepcopy(self.unpack()))
+        return self.__class__(self._deepcopy(self.unpack()))
 
     #
     #   Iterator Methods
@@ -78,11 +84,11 @@ class Contents:
         return keys
 
     def values(self, unpacked=False):
-        contents = self.unpacked if unpacked else self
+        contents = self.unpack() if unpacked else self
         return (contents[key] for key in self.keys())
 
     def items(self, unpacked=False):
-        contents = self.unpacked if unpacked else self
+        contents = self.unpack() if unpacked else self
         return ((key, contents[key]) for key in self.keys())
 
     def __iter__(self):
@@ -92,22 +98,22 @@ class Contents:
     #   Getter Methods
     #
 
-    def __getitem__(self, key):
+    def __getitem__(self, key, **kwargs):
 
         if isinstance(key, self._convert_to_contents):
             key = self.__class__(key)
     
         if isinstance(key, Contents):
-            item = self._get_with_contents(key)
+            item = self._get_with_contents(key, kwargs)
         else:
             item = self._get_with_hash(key)
         
         return item
     
-    def _get_with_contents(self, key_contents):
+    def _get_with_contents(self, key_contents, kwargs):
         item = {key: self._contents[key][val] for key, val in key_contents.items()}
         item = list(item.values()) if self._type is list else item
-        return self.__class__(item)   
+        return self.__class__(item, **kwargs)   
 
     def _get_with_hash(self, key):
         try:
@@ -150,7 +156,7 @@ class Contents:
         if key_iterable:
             return self[key_i].get(*key_iterable)
         else:
-            return self.contents[key_i]
+            return self._contents[key_i]
 
     @property
     def contents(self):
