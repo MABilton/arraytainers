@@ -18,10 +18,10 @@ class ArraytainerTests(ArrayMixin, FunctionMixin, IndexMixin, IterableMixin, Set
         # Is exception is a string:
         if isinstance(exception, str):
             # Group errors according to 'functionally equivalent' groupings:
-            testing_numpytainer = 'numpy' in self.container_class.__name__.lower()
+            testing_jaxtainer = 'jax' in self.container_class.__name__.lower()
             error_groupings = {'key': (IndexError, KeyError, TypeError), # Indexing/key errors
-                               'broadcast': (ValueError,) if testing_numpytainer else (TypeError, ValueError), # Broadcasting errors
-                               'reshape': (ValueError,) if testing_numpytainer else (InconclusiveDimensionOperation,)} # Reshaping error
+                               'broadcast': (TypeError, ValueError) if testing_jaxtainer else (ValueError,), # Broadcasting errors
+                               'reshape': (InconclusiveDimensionOperation,) if testing_jaxtainer else (ValueError,)} # Reshaping error
             for key, group in error_groupings.items(): 
                 if key in exception.lower():
                     exception_class = group

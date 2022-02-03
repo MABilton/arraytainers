@@ -8,7 +8,7 @@ class FunctionMixin:
     
     def perform_function_test(self, *contents_list, func=None, args=(), kwargs=None, exception=False):
         kwargs = {} if kwargs is None else kwargs
-        arraytainer_list = [self.container_class(contents) for contents in contents_list]
+        arraytainer_list = [self.container_class(contents, greedy=True) for contents in contents_list]
         expected, found_exception = utils.apply_func_to_contents(*contents_list, func=func, args=args, kwargs=kwargs)  
         # If an exception is not specified, set it to exception encountered by apply_func_to_contents; note that
         # None is truthy in Python - this assignment will not occur if specified exception=None:
@@ -18,7 +18,7 @@ class FunctionMixin:
         if exception is None:
             result = func(*arraytainer_list, *args, **kwargs)
             utils.assert_equal_values(result.unpacked, expected, approx_equal=True)
-            utils.assert_same_types(result, self.container_class(expected))
+            utils.assert_same_types(result, self.container_class(expected, greedy=True))
         else:
             self.assert_exception(func, exception, *arraytainer_list)
 
@@ -62,7 +62,7 @@ class FunctionMixin:
     {'list': cartesian_prod( [[(3,3,4),(3,4,5)],(2,2,3)], 
                                 ( ( [[(4,5),(5,6)],(3,4)], 'ijk,kl->ijl', None ), 
                                   ( [(2,3),(3,2)], 'ijk,li->ljk', None ), 
-                                  ( [[(2,3)],(3,2)], 'ijk,li->ljk', 'key_error' ),
+                                  ( [[(2,3)],(3,2)], 'ijk,li->ljk', ValueError ),
                                   ( [(2,3),(3,3)], 'ijk,li->ljk', ValueError ) ) ),
      'dict': cartesian_prod({'a':(3,3,4),'b':{'a':(3,4,5),'b':(3,2,3)}}, 
                                 ( ( {'a':(4,1),'b':{'a':(5,2),'b':(3,1)}}, 'ijk,kl->ijl', None ), 
@@ -89,13 +89,13 @@ class FunctionMixin:
                         ( ( [(2,3),(3,2)], None ),
                           ( [[(2,3),(2,1)],[(3,1),(3,2)]], None ),
                           ( [[(2,3),(2,1)],[(3,1),[(3,2),(3,1)]]], None ),
-                          ( [[(2,3)],(3,2)], 'key_error' ),
+                          ( [[(2,3)],(3,2)], 'broadcast_error' ),
                           ( [[(3,3),(2,1)],[(3,1),(3,2)]], 'broadcast_error' ) ) ),
      'dict': cartesian_prod( {'a':{'a':(2,2),'b':(1,2)},'b':{'a':(2,3),'b':(1,3)}},
                         (  ( {'a':(2,3),'b':(3,1)}, None ),
                            ( {'a':{'a':(2,1),'b':(2,3)},'b':(3,1)}, None ),
                            ( {'a':{'a':(2,1),'b':(2,3)},'b':{'a':(3,1),'b':(3,2)}}, None ),
-                           ( {'a':(2,3),'b':(3,1),'c':(3,1)}, 'key_error' ) ) ),
+                           ( {'a':(2,3),'b':(3,1),'c':(3,1)}, 'broadcast_error' ) ) ),
      'mixed': cartesian_prod( [{'a':[(1,3),(2,3)],'b':[(1,3),(2,3)]},{'c':[(1,2),(2,2)],'d':[(1,2),(2,2)]}],
                         (  ( [(3,2),(2,1)], None ),
                            ( [{'a':(3,1),'b':(3,2)},{'a':(2,1),'b':(2,2)}], None ),
@@ -146,7 +146,7 @@ class FunctionMixin:
         def mean_func(x, axis):
             result = np.mean(x, axis=axis)
             if isinstance(result, Number):
-                result = self.array_constructor(result)
+                result = self.array_constructor(result, greedy=True)
             return result
 
         self.perform_function_test(contents, func=mean_func, args=(axis,), exception=exception)

@@ -1,14 +1,12 @@
 from warnings import warn
 
-from .base import Arraytainer
-from .numpytainer import Numpytainer
+from .arraytainer import Arraytainer
 try:
     from .jaxtainer import Jaxtainer
 except ImportError:
-    warning_msg = ('WARNING: Failed to import Jaxtainers; please visit '  
-                   'https://github.com/google/jax#installation to ' 
-                   'see how to correctly install Jax.')
-    warn(warning_msg)
+    warn('Failed to import Jaxtainers; please visit '  
+         'https://github.com/google/jax#installation for ' 
+         'details on installing Jax.')
 
 # Clean-up namespace of module:
-del warn, numpytainer, jaxtainer
+del warn
