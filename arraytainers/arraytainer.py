@@ -118,8 +118,13 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         return all(isinstance(val_i, self._arrays) for val_i in converted_list)
 
     def _all_arrays_of_equal_shape(self, converted_list):
-        first_array_shape = converted_list[0].shape
-        return all(array_i.shape == first_array_shape for array_i in converted_list)
+        # Converted list could be empty:
+        if converted_list:
+            first_array_shape = converted_list[0].shape
+            all_equal = all(array_i.shape == first_array_shape for array_i in converted_list)
+        else:
+            all_equal = True
+        return all_equal
 
     #
     #   Getter Methods
@@ -173,11 +178,12 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         self._contents[key][idx] = new_value
 
     def _set_with_arraytainer(self, arraytainer_key, new_value):
-        for key, val in key_container.items():
+        for key, val in arraytainer_key.items():
+            new_value_i = new_value[key] if isinstance(new_value, Arraytainer) else new_value
             if isinstance(val, self._arrays):
-                self._set_array_item(key, val, new_value)
+                self._set_array_values(key, val, new_value_i)
             else:
-                self._contents[key][val] = new_value[key] if isinstance(new_value, Arraytainer) else new_value
+                self._contents[key][val] = new_value_i
 
     #
     #   Array Methods and Properties

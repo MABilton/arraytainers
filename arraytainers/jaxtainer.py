@@ -1,4 +1,5 @@
 from .arraytainer import Arraytainer
+import copy
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -19,18 +20,25 @@ class Jaxtainer(Arraytainer):
     #
 
     def _deepcopy(self, contents):
+        
         copied_contents = contents.copy()
         contents_iter = contents.items() if isinstance(contents, dict) else enumerate(contents)
+        
         for key, val in contents_iter:
+            # Jax arrays converted to Numpy arrays if copied (Jax arrays are immutable):
             if isinstance(val, self._arrays):
                 copied_contents[key] = val
             elif isinstance(val, (list, dict, tuple)):
                 copied_contents[key] = self._deepcopy(val)
             else:
-                copied_contents[key] = val.copy() 
+                try:
+                    copied_contents[key] = copy.copy(val)
+                except AttributeError:
+                    copied_contents[key] = val
+
         return copied_contents
 
-    def _set_array_val(self, key, idx, value):
+    def _set_array_values(self, key, idx, value):
         self._contents[key] = self.contents[key].at[idx].set(value)
 
     def _convert_to_array(self, val):
