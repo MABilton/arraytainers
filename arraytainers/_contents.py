@@ -92,7 +92,7 @@ class Contents:
         return ((key, contents[key]) for key in self.keys())
 
     def __iter__(self):
-        return self.values()
+        return iter(self._contents)
     
     #
     #   Getter Methods
