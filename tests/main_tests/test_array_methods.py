@@ -16,6 +16,7 @@ class ArrayMixin:
         shapes_arraytainer = self.container_class(std_shapes, greedy=True)
 
         for order in ('C', 'F'):
+
             # Flatten individual vectors within contents structure:
             contents = deepcopy(std_contents)
             expected, _ = utils.apply_func_to_contents(contents, func=lambda x: np.ravel(x, order=order))

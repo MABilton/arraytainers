@@ -41,7 +41,7 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
             raise ValueError(f'Array contains {array.size} elements, but shapes '
                              f'contains {total_size} elements.')
 
-        vector = array.flatten(order=order).tolist()
+        vector = array.flatten(order=order)
         contents = cls._create_contents_from_vector(vector, shapes, order)
 
         return cls(contents, convert_arrays, greedy, nested)
@@ -62,27 +62,36 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         return np.concatenate(val_list)
 
     @classmethod
-    def _create_contents_from_vector(cls, vector, shapes, order):
+    def _create_contents_from_vector(cls, vector, shapes, order, elem_idx=None, first_call=True):
 
-        output = {}
+        if elem_idx is None:
+            elem_idx = 0
 
+        new_contents = {}
         for key, shape in shapes.items():
             if isinstance(shape, Arraytainer):
-                output[key] = cls._create_contents_from_vector(vector, shape, order)
+                new_contents[key], elem_idx = cls._create_contents_from_vector(vector, shape, order, elem_idx, first_call=False)
             else:
-                array_vals = cls._extract_array_vals(vector, shape)
-                output[key] = array_vals.reshape(shape, order=order)
+                array_vals, elem_idx = cls._extract_array_vals(vector, elem_idx, shape)
+                new_contents[key] = array_vals.reshape(shape, order=order)
 
         if shapes._type is list:
-            output = list(output.values())
+            new_contents = list(new_contents.values())
 
+        if first_call:
+            output = new_contents
+        else:
+            output = (new_contents, elem_idx)
+        
         return output
  
     @staticmethod
-    def _extract_array_vals(vector, shape):
+    def _extract_array_vals(vector, elem_idx, shape):
         # Jaxtainer version of this method uses jnp methods instead of np:
         num_elem = np.prod(shape)
-        return np.array([vector.pop(0) for _ in range(num_elem)])
+        array_vals = vector[elem_idx:elem_idx+num_elem]
+        elem_idx += num_elem
+        return array_vals, elem_idx
 
     #
     #   Array Conversion Methods
