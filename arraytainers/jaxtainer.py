@@ -45,9 +45,11 @@ class Jaxtainer(Arraytainer):
         return jnp.array(val)
 
     @staticmethod
-    def _extract_array_vals(vector, shape):
+    def _extract_array_vals(vector, elem_idx, shape):
         num_elem = jnp.prod(shape)
-        return jnp.array([vector.pop(0) for _ in range(num_elem)])
+        array_vals = vector[elem_idx:elem_idx+num_elem]
+        elem_idx += num_elem
+        return array_vals, elem_idx
 
     #
     #   Numpy Function Handling Methods (Overrides Arraytainer methods)
