@@ -26,14 +26,40 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
 
     @classmethod
     def from_array(cls, array, shapes, order='C', convert_arrays=True, greedy=False, nested=True):
+        
+        # Concatenate shapes tuple into a single arraytainer:
+        if not isinstance(shapes, tuple):
+            shapes = tuple([shapes])
+        shapes = cls._concatenate_elements_to_array(shapes)
+
+        if not isinstance(shapes, Arraytainer):
+            raise ValueError('shapes must container at least one arraytainer.')
+            
+        # Ensure correct number of elements in array:
+        total_size = np.prod(shapes).sum_all()
+        if total_size != array.size:
+            raise ValueError(f'Array contains {array.size} elements, but shapes '
+                             f'contains {total_size} elements.')
 
         vector = array.flatten(order=order).tolist()
-        if not isinstance(shapes, Arraytainer):
-            shapes = cls(shapes, greedy=True)
-
         contents = cls._create_contents_from_vector(vector, shapes, order)
 
         return cls(contents, convert_arrays, greedy, nested)
+
+    @classmethod
+    def _concatenate_elements_to_array(cls, val_tuple):
+        
+        val_list = list(val_tuple)
+
+        for idx, val_i in enumerate(val_list):
+            if not isinstance(val_i, (Arraytainer, *cls._arrays)):
+                val_i = cls._convert_to_array(val_i)
+                # Shape arrays must have at least one dimension for concatenate:
+                if val_i.ndim == 0:
+                    val_i = val_i[None]
+                val_list[idx] = val_i
+
+        return np.concatenate(val_list)
 
     @classmethod
     def _create_contents_from_vector(cls, vector, shapes, order):
@@ -238,28 +264,30 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
     def ndim(self):
         return np.ndim(self)
 
+    @property
+    def sizes(self):
+        return np.prod(self.shape)
+
+    @property
+    def size(self):
+        size = self.sizes.sum_all()
+        if isinstance(size, self._arrays):
+            size = size.item()
+        return size
+
     def reshape(self, *new_shapes, order='C'):
-
-        new_shapes = list(new_shapes)
-
-        for idx, shape in enumerate(new_shapes):
-            if not isinstance(shape, (Arraytainer, *self._arrays)):
-                shape = self._convert_to_array(shape)
-                # Shape arrays must have at least one dimension for concatenate:
-                if shape.ndim == 0:
-                    shape = shape[None]
-                new_shapes[idx] = shape
-        new_shapes = np.concatenate(new_shapes)
-
-        if len(new_shapes)==1 and isinstance(new_shapes[0], (Arraytainer, tuple)):
-            new_shapes = new_shapes[0]
-
+        new_shapes = self._concatenate_elements_to_array(new_shapes)
         return np.reshape(self, new_shapes, order=order)
 
     def flatten(self, order='C', return_array=True):
         output = np.squeeze(np.ravel(self, order=order))
         if return_array:
-            output = np.concatenate(output.list_elements())
+            # Zero-dimensional elements cause concatenate to throw error:
+            elem_list = output.list_elements()
+            for idx, elem in enumerate(elem_list):
+                if elem.ndim == 0:
+                    elem_list[idx] = elem[None]
+            output = np.concatenate(elem_list)
         return output
 
     #
