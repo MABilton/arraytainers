@@ -35,7 +35,7 @@ class ArrayMixin:
                 # Check that we can construct original arraytainer from flattened; must work when shape is provided
                 # as a list/dict AND when provided as an arraytainer:
                 vector = deepcopy(expected)
-                for shape in (std_shapes, shapes_arraytainer):
+                for shape in [shapes_arraytainer]:
                     result = self.container_class.from_array(vector, shape, order=order)
                     utils.assert_equal_values(std_contents, result.unpacked)
                     utils.assert_same_types(arraytainer, result)

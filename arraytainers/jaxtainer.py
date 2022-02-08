@@ -11,8 +11,7 @@ class Jaxtainer(Arraytainer):
     _arrays = (np.ndarray, jnp.DeviceArray)
     _jnp_submodules_to_search = ('', 'linalg', 'fft')
 
-    def __init__(self, contents, convert_arrays=True, greedy=False, floats_only=False, nested=True):
-        self.floats_only = floats_only
+    def __init__(self, contents, convert_arrays=True, greedy=False, nested=True):
         super().__init__(contents, convert_arrays, greedy, nested)
 
     #
@@ -41,11 +40,9 @@ class Jaxtainer(Arraytainer):
     def _set_array_values(self, key, idx, value):
         self._contents[key] = self.contents[key].at[idx].set(value)
 
-    def _convert_to_array(self, val):
-        array = jnp.array(val)
-        if self.floats_only:
-            array = array.astype(float)   
-        return array
+    @staticmethod
+    def _convert_to_array(val):
+        return jnp.array(val)
 
     @staticmethod
     def _extract_array_vals(vector, shape):
