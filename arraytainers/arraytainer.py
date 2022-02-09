@@ -52,12 +52,18 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         val_list = list(val_tuple)
 
         for idx, val_i in enumerate(val_list):
+            
             if not isinstance(val_i, (Arraytainer, *cls._arrays)):
                 val_i = cls._convert_to_array(val_i)
                 # Shape arrays must have at least one dimension for concatenate:
                 if val_i.ndim == 0:
                     val_i = val_i[None]
-                val_list[idx] = val_i
+
+            elif isinstance(val_i, Arraytainer):
+                # 0 dimensional arrays in arraytainer cause concatenate to throw errors:
+                val_i = np.atleast_1d(val_i)
+
+            val_list[idx] = val_i
 
         return np.concatenate(val_list)
 
