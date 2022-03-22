@@ -271,6 +271,10 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
 
         return shapes
 
+    #
+    #   Array-Like Methods
+    #
+
     @property
     def shape(self):
         return self.get_shape()

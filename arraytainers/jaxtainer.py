@@ -9,16 +9,19 @@ from jax.tree_util import register_pytree_node_class
 class Jaxtainer(Arraytainer):
 
     _arrays = (np.ndarray, jnp.DeviceArray)
-    _jnp_submodules_to_search = ('', 'linalg', 'fft')
 
     def __init__(self, contents, convert_arrays=True, greedy=False, nested=True):
         super().__init__(contents, convert_arrays, greedy, nested)
 
     #
-    #   Array Methods (Overrides Arraytainer methods)
+    #   Overridden Methods
     #
 
-    def _deepcopy(self, contents):
+    def __deepcopy__(self, memo):
+        deepcopied_contents = self._deepcopy_contents(self.unpack())
+        return self.__class__(deepcopied_contents)
+
+    def _deepcopy_contents(self, contents):
         
         copied_contents = contents.copy()
         contents_iter = contents.items() if isinstance(contents, dict) else enumerate(contents)
@@ -26,14 +29,11 @@ class Jaxtainer(Arraytainer):
         for key, val in contents_iter:
             # Jax arrays converted to Numpy arrays if copied (Jax arrays are immutable):
             if isinstance(val, self._arrays):
-                copied_contents[key] = val
+                copied_contents[key] = self._convert_to_array(val)
             elif isinstance(val, (list, dict, tuple)):
-                copied_contents[key] = self._deepcopy(val)
+                copied_contents[key] = self._deepcopy_contents(val)
             else:
-                try:
-                    copied_contents[key] = copy.copy(val)
-                except AttributeError:
-                    copied_contents[key] = val
+                copied_contents[key] = copy.deepcopy(val)
 
         return copied_contents
 
@@ -85,6 +85,7 @@ class Jaxtainer(Arraytainer):
             prepped_args.pop('out', None)
         return prepped_args
 
+    _jnp_submodules_to_search = ('', 'linalg', 'fft')
     def _find_jnp_method(self, func):
 
         method_name = str(func.__name__)
