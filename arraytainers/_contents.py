@@ -34,7 +34,7 @@ class Contents:
         if isinstance(contents, tuple):
             contents = list(contents)
 
-        return self._deepcopy(contents)
+        return self._deepcopy_contents(contents)
 
     def _nested_convert_to_contents(self, kwargs):
         for key, val in self.items():
@@ -64,13 +64,27 @@ class Contents:
     def __repr__(self):
         return f"{self.__class__.__name__}({repr(self.unpack())})"
 
-    # deepcopy changes jnp.array np.array, so Jaxtainer overload this method:
+    #
+    #   Copying Methods
+    #
+
+    # deepcopy changes jnp.array np.array, so Jaxtainer overloads this method:
+
+    def __copy__(self):
+        return self.__class__(self.unpack())
+
+    def __deepcopy__(self, memo):
+        return self.__class__(copy.deepcopy(self.unpack()))
+
     @staticmethod
-    def _deepcopy(contents):
+    def _deepcopy_contents(contents):
         return copy.deepcopy(contents)
 
     def copy(self):
-        return self.__class__(self._deepcopy(self.unpack()))
+        return self.__copy__()
+
+    def deepcopy(contents):
+        return self.__deepcopy__()
 
     #
     #   Iterator Methods
@@ -228,7 +242,7 @@ class Contents:
         func_return = {}
         for key, val in self.items():
             if skip==0:
-                func_return[key] = self._apply_function_to_contents(val, key, broadcast, args, kwargs)
+                func_return[key] = self._apply_func_to_contents(func, val, key, broadcast, args, kwargs)
             else:
                 func_return[key] = val.apply(func, skip=skip-1, broadcast=broadcast, args=args, kwargs=kwargs) 
 
@@ -238,10 +252,10 @@ class Contents:
         return self.__class__(func_return)
     
     @staticmethod
-    def _apply_function_to_contents(val, key, broadcast, args, kwargs):
+    def _apply_func_to_contents(func, val, key, broadcast, args, kwargs):
 
         if broadcast:
-            args_i = self._prepare_apply_args_for_broadcasting(args, key)
+            args_i = self._prepare_args_for_broadcasting(args, key)
             kwargs_i = self._prepare_apply_args_for_broadcasting(kwargs, key)
             if isinstance(val, Contents):
                 output = val.apply(func, broadcast=True, args=args_i, kwargs=kwargs_i)
@@ -252,7 +266,7 @@ class Contents:
 
         return output 
 
-    def _prepare_apply_args_for_broadcasting(self, args, contents_key):
+    def _prepare_args_for_broadcasting(self, args, contents_key):
         
         args_iter = args.items() if isinstance(args, dict) else enumerate(args)
 
