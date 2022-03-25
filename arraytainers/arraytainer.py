@@ -1,4 +1,5 @@
 from ._contents import Contents
+import copy
 import numbers
 import numpy as np
 import more_itertools
@@ -323,18 +324,16 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
 
     def _manage_func_call(self, func, types, *args, **kwargs):
 
-        func_return = {}
         arraytainer_list = self._list_arraytainers_in_args(args) + self._list_arraytainers_in_args(kwargs)
         largest_arraytainer = self._find_largest_arraytainer(arraytainer_list)
         self._check_arraytainer_arg_compatability(arraytainer_list, largest_arraytainer)
+        shared_keyset = self._get_shared_keyset(arraytainer_list)
 
-        for key in largest_arraytainer.keys():
+        func_return = copy.deepcopy(largest_arraytainer.contents)
+        for key in shared_keyset:
             args_i = self._prepare_func_args(args, key)
             kwargs_i = self._prepare_func_args(kwargs, key)
             func_return[key] = func(*args_i, **kwargs_i)
-
-        if self._type is list:
-            func_return = list(func_return.values())
 
         return self.__class__(func_return, greedy=True)
 
@@ -353,10 +352,10 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
 
     @staticmethod
     def _find_largest_arraytainer(arraytainer_list):
-        greatest_len = -1
+        largest_len = -1
         for arraytainer in arraytainer_list:
-            if len(arraytainer) > greatest_len:
-                greatest_len = len(arraytainer)
+            if len(arraytainer) > largest_len:
+                largest_len = len(arraytainer)
                 largest_arraytainer = arraytainer
         return largest_arraytainer
 
@@ -367,14 +366,19 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         for arraytainer_i in arraytainer_list:
             
             if arraytainer_i._type != largest_arraytainer._type:
-                raise KeyError('Containers being combined through operations must',
-                                'be all dictionary-like or all list-like')
+                raise KeyError('Arraytainers being combined through operations must',
+                               'be all dictionary-like or all list-like')
             
             ith_keyset = set(arraytainer_i.keys())
             if not ith_keyset.issubset(largest_keyset):
-                raise KeyError('Containers being combined through operations must',
-                                'have identical sets of keys.')
+                raise KeyError(f'Keys of an Arraytainer (= {ith_keyset}) is not a subset of the ',
+                               f"keys of a larger Arraytainer (={largest_keyset}) it's being combined with.")
     
+    @staticmethod
+    def _get_shared_keyset(arraytainer_list):
+        return set.intersection(*[set(arraytainer.keys()) for arraytainer in arraytainer_list])
+
+
     @staticmethod
     def _prepare_func_args(args, key):
         

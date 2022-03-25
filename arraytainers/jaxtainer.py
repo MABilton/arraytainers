@@ -62,8 +62,10 @@ class Jaxtainer(Arraytainer):
         arraytainer_list = self._list_arraytainers_in_args(args) + self._list_arraytainers_in_args(kwargs)
         largest_arraytainer = self._find_largest_arraytainer(arraytainer_list)
         self._check_arraytainer_arg_compatability(arraytainer_list, largest_arraytainer)
+        shared_keyset = self._get_shared_keyset(arraytainer_list)
 
-        for key in largest_arraytainer.keys():
+        func_return = copy.deepcopy(largest_arraytainer.contents)
+        for key in shared_keyset:
             
             args_i = self._prepare_func_args(args, key)
             kwargs_i = self._prepare_func_args(kwargs, key)
@@ -72,9 +74,6 @@ class Jaxtainer(Arraytainer):
             # Need to call Numpy method for recursion on Arraytainer arguments:
             method = self._find_jnp_method(func) if not arraytainer_list_i else func
             func_return[key] = method(*args_i, **kwargs_i)
-
-        if self._type is list:
-            func_return = list(func_return.values())
 
         return self.__class__(func_return, greedy=True)
         

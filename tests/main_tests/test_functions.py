@@ -10,11 +10,12 @@ class FunctionMixin:
         kwargs = {} if kwargs is None else kwargs
         arraytainer_list = [self.container_class(contents, greedy=True) for contents in contents_list]
         expected, found_exception = utils.apply_func_to_contents(*contents_list, func=func, args=args, kwargs=kwargs)  
+        
         # If an exception is not specified, set it to exception encountered by apply_func_to_contents; note that
         # None is truthy in Python - this assignment will not occur if specified exception=None:
         if not exception:
             exception = found_exception
-        
+
         if exception is None:
             result = func(*arraytainer_list, *args, **kwargs)
             utils.assert_equal_values(result.unpacked, expected, approx_equal=True)
@@ -62,9 +63,8 @@ class FunctionMixin:
     {'list': cartesian_prod( [[(3,3,4),(3,4,5)],(2,2,3)], 
                                 ( ( [[(4,5),(5,6)],(3,4)], 'ijk,kl->ijl', None ), 
                                   ( [(2,3),(3,2)], 'ijk,li->ljk', None ), 
-                                  ( [[(2,3)],(3,2)], 'ijk,li->ljk', ValueError ),
-                                  ( [(2,3),(3,3)], 'ijk,li->ljk', ValueError ) ) ),
-     'dict': cartesian_prod({'a':(3,3,4),'b':{'a':(3,4,5),'b':(3,2,3)}}, 
+                                  ( [(2,3),(3,3)], 'ijk,li->ljk', ValueError ) ) ), #( [[(2,3)],(3,2)], 'ijk,li->ljk', ValueError ),
+     'dict': cartesian_prod({'a':(3,3,4),'b':{'a':(3,4,5),'b':(3,2,3)}},  
                                 ( ( {'a':(4,1),'b':{'a':(5,2),'b':(3,1)}}, 'ijk,kl->ijl', None ), 
                                     ( {'a':(4,3),'b':(2,3)}, 'ijk,li->ljk', None ),
                                     ( {'a':(4,3),'c':(2,3)}, 'ijk,li->ljk', 'key_error' ),
@@ -89,13 +89,13 @@ class FunctionMixin:
                         ( ( [(2,3),(3,2)], None ),
                           ( [[(2,3),(2,1)],[(3,1),(3,2)]], None ),
                           ( [[(2,3),(2,1)],[(3,1),[(3,2),(3,1)]]], None ),
-                          ( [[(2,3)],(3,2)], 'broadcast_error' ),
-                          ( [[(3,3),(2,1)],[(3,1),(3,2)]], 'broadcast_error' ) ) ),
+                          ( [[(3,3),(2,1)],[(3,1),(3,2)]], 'broadcast_error' ) ) ), #( [[(2,3)],(3,2)], 'broadcast_error' ),
      'dict': cartesian_prod( {'a':{'a':(2,2),'b':(1,2)},'b':{'a':(2,3),'b':(1,3)}},
                         (  ( {'a':(2,3),'b':(3,1)}, None ),
                            ( {'a':{'a':(2,1),'b':(2,3)},'b':(3,1)}, None ),
                            ( {'a':{'a':(2,1),'b':(2,3)},'b':{'a':(3,1),'b':(3,2)}}, None ),
-                           ( {'a':(2,3),'b':(3,1),'c':(3,1)}, 'broadcast_error' ) ) ),
+                           ( {'a':(2,3),'b':(2,1),'c':(3,1)}, 'broadcast_error' ),
+                           ( {'a':(2,3),'c':((2,3))}, 'key_error' )  ) ),
      'mixed': cartesian_prod( [{'a':[(1,3),(2,3)],'b':[(1,3),(2,3)]},{'c':[(1,2),(2,2)],'d':[(1,2),(2,2)]}],
                         (  ( [(3,2),(2,1)], None ),
                            ( [{'a':(3,1),'b':(3,2)},{'a':(2,1),'b':(2,2)}], None ),
@@ -113,8 +113,7 @@ class FunctionMixin:
     KRON_TEST_CASES = \
     {'list': cartesian_prod( [(2,3),[(2,1),(2,2)]], 
                            ( ( [(2,2), (2,1)], None ),
-                             ( [(2,2),[(1,3),(2,1)]], None ),
-                             ( [[(2,2)],[(2,2)]], 'key_error' ) ) ),
+                             ( [(2,2),[(1,3),(2,1)]], None )) ),
      'dict': cartesian_prod( {'a':(2,3), 'b':{'c':(2,1),'d':(2,2)}},
                            ( ( {'a':(2,2), 'b':(3,2)}, None ),
                              ( {'a':(2,2), 'b':{'c':(3,2),'d':(2,1)}}, None ),
@@ -131,6 +130,7 @@ class FunctionMixin:
                                                          indirect=['contents_list'])
     def test_kron(self, contents_list, exception):
         kron_func = lambda x,y : np.kron(x, y)
+        print(exception)
         self.perform_function_test(*contents_list, func=kron_func, exception=exception)
     
     MEAN_AXIS_AND_EXCEPTIONS = ( (None, None), (0, None), (1, None), ((0,1), None), (2, Exception) )
