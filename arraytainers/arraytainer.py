@@ -189,6 +189,13 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
     #   Setter Methods
     #
 
+    def update(self, new_val, *key_iterable):
+        if isinstance(new_val, numbers.Number):
+            new_val = self._convert_to_array(new_val)
+        if not isinstance(new_val, self._arrays):
+            new_val = self.__class__(new_val)
+        super().update(new_val, *key_iterable)
+
     def __setitem__(self, key, new_value):
         if isinstance(key, self._arrays) or self._is_slice(key):
             self._set_with_array(key)
