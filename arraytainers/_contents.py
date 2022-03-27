@@ -133,7 +133,7 @@ class Contents:
         try:
             item = self._contents[key]
         except KeyError:
-            raise KeyError(f'{key} is not a key in this {self.__class__.__name__}; ',
+            raise KeyError(f'{key} is not a key in this {self.__class__.__name__}; '
                            f'valid keys for this {self.__class__.__name__} are {tuple(self.keys())}.')
         return item
 
@@ -238,20 +238,28 @@ class Contents:
                                 "use the update method instead.")
             raise error
 
-    def update(self, new_val, *key_iterable):
+    def assign(self, new_val, *key_iterable):
+        key_iterable = list(key_iterable)
+        key = key_iterable.pop(0)
+        if key_iterable:
+            self[key].assign(new_val, *key_iterable)
+        else:
+            self[key] = new_val
 
+    def update(self, new_val, *key_iterable):
         key_iterable = list(key_iterable)
         key = key_iterable.pop(0)
         if key_iterable:
             self[key].update(new_val, *key_iterable)
         else:
-            if isinstance(self[key], Contents):
-                if self._type is dict:
+            try:
+                if self[key]._type is dict:
                     self[key]._contents.update(new_val)
                 else:
                     self[key]._contents.append(new_val)
-            else:
-                self[key] = new_val
+            except AttributeError:
+                raise TypeError('Update can only add elements to arraytainer elements; '
+                               f'attempted to update a {self[key].__class__.__name__} element.')
 
     #
     #   Function-Application Methods
