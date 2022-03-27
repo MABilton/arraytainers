@@ -176,27 +176,48 @@ class Contents:
     def contents(self):
         return self._contents
 
+    def list_keys(self):
+        return self._get_elements_and_keys(self.unpack(), return_elements=False, return_keys=True)
+
     def list_elements(self):
-        return self._flatten_contents(self.unpack())
+        return self._get_elements_and_keys(self.unpack(), return_elements=True, return_keys=False)
+
+    def list_items(self):
+        return self._get_elements_and_keys(self.unpack(), return_elements=True, return_keys=True)
 
     @staticmethod
-    def _flatten_contents(contents, element_list=None):
+    def _get_elements_and_keys(contents, return_elements, return_keys, output_list=None, key_list=None):
         
-        if element_list is None:
-            element_list = []
+        if output_list is None:
+            output_list = []
         
         if isinstance(contents, list):
             keys = range(len(contents))  
         else:
             keys = contents.keys()
 
+        key_list_copy = copy.copy(key_list)
         for key in keys:
+
+            if return_keys:
+                if key_list_copy is None:
+                    key_list = [key]
+                else:
+                    key_list = [*key_list_copy, key]
+
             if isinstance(contents[key], (dict,list)):
-                element_list = Contents._flatten_contents(contents[key], element_list)
+                output_list = \
+                Contents._get_elements_and_keys(contents[key], return_elements, return_keys, output_list, key_list)
             else:
-                element_list.append(contents[key])
+
+                if return_elements and return_keys:
+                    output_list.append((tuple(key_list), contents[key]))
+                elif return_keys:
+                    output_list.append(tuple(key_list))
+                elif return_elements:
+                    output_list.append(contents[key])
         
-        return element_list
+        return output_list
 
     #
     #   Setter Methods
@@ -218,16 +239,19 @@ class Contents:
             raise error
 
     def update(self, new_val, *key_iterable):
+
+        key_iterable = list(key_iterable)
+        key = key_iterable.pop(0)
         if key_iterable:
-            key_iterable = list(key_iterable)
-            key_i = key_iterable.pop(0)
-            self[key_i].update(new_val, *key_iterable)
+            self[key].update(new_val, *key_iterable)
         else:
-            new_val = self.__class__(new_val)
-            if self._type is dict:
-                self.contents.update(new_val)
+            if isinstance(self[key], Contents):
+                if self._type is dict:
+                    self[key]._contents.update(new_val)
+                else:
+                    self[key]._contents.append(new_val)
             else:
-                self.contents.append(new_val)
+                self[key] = new_val
 
     #
     #   Function-Application Methods
