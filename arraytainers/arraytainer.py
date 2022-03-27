@@ -189,12 +189,20 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
     #   Setter Methods
     #
 
-    def update(self, new_val, *key_iterable):
-        if isinstance(new_val, numbers.Number):
-            new_val = self._convert_to_array(new_val)
-        if not isinstance(new_val, self._arrays):
-            new_val = self.__class__(new_val)
-        super().update(new_val, *key_iterable)
+    def update(self, new_elem, *key_iterable):
+        new_elem = self._convert_to_array_or_arraytainer(new_elem)
+        super().update(new_elem, *key_iterable)
+
+    def assign(self, new_val, *key_iterable):
+        new_val = self._convert_to_array_or_arraytainer(new_val)
+        super().assign(new_val, *key_iterable)
+
+    def _convert_to_array_or_arraytainer(self, val):
+        if isinstance(val, numbers.Number):
+            val = self._convert_to_array(val)
+        if not isinstance(val, self._arrays):
+            val = self.__class__(val)
+        return val
 
     def __setitem__(self, key, new_value):
         if isinstance(key, self._arrays) or self._is_slice(key):
@@ -373,12 +381,12 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
         for arraytainer_i in arraytainer_list:
             
             if arraytainer_i._type != largest_arraytainer._type:
-                raise KeyError('Arraytainers being combined through operations must',
+                raise KeyError('Arraytainers being combined through operations must'
                                'be all dictionary-like or all list-like')
             
             ith_keyset = set(arraytainer_i.keys())
             if not ith_keyset.issubset(largest_keyset):
-                raise KeyError(f'Keys of an Arraytainer (= {ith_keyset}) is not a subset of the ',
+                raise KeyError(f'Keys of an Arraytainer (= {ith_keyset}) is not a subset of the '
                                f"keys of a larger Arraytainer (={largest_keyset}) it's being combined with.")
     
     @staticmethod
