@@ -219,6 +219,15 @@ class Contents:
         
         return output_list
 
+    def tolist(self):
+        output = {}
+        for key, val in self.items():
+            if not isinstance(val, (tuple, list, dict)):
+                output[key] = val.tolist() 
+        if self._type is list:
+            output = list(output.values())
+        return output
+
     #
     #   Setter Methods
     #
