@@ -1,219 +1,411 @@
-from ._contents import Contents
+import warnings
 import copy
+from more_itertools import always_iterable
 import numbers
 import numpy as np
-import more_itertools
 
-class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
+class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
-    _arrays = (np.ndarray,)
+    def __init__(self, contents, array_conversions=True, dtype=None):
+        if not isinstance(contents, (list, dict)):
+            raise ValueError(f'contents must be either a list or a dict, not a {type(contents)}.')
+        contents = self._deepcopy_contents(contents)
+        if isinstance(contents, dict) and self._keys_contain_tuple(contents):
+            raise KeyError("contents.keys() contains a tuple, which isn't allowed in an Arraytainer.")
+        contents = self._recursive_arraytainer_conversion(contents, dtype, array_conversions)
+        self._contents = contents
+        self._dtype = dtype
+
+    @staticmethod
+    def _keys_contain_tuple(contents):
+        keys = contents.keys()
+        contains_tuple = False
+        for key in always_iterable(keys):
+            if isinstance(key, tuple):
+                contains_tuple = True
+                break
+        return contains_tuple
 
     #
-    #   Constructor Methods
+    #   Alternative Constructors
     #
-
-    def __init__(self, contents, convert_arrays=True, greedy=False, nested=True):
-        
-        # All arraytainers must minimally comprise of a list:
-        if not isinstance(contents, (list, dict, tuple, Arraytainer)):
-            contents = [contents]
-            # To prevent array converter converting outer list to array:
-            greedy=True
-
-        if convert_arrays:
-            contents = self._convert_contents_to_arrays(contents, greedy)
-
-        super().__init__(contents, nested, greedy=greedy) #convert_arrays=convert_arrays
 
     @classmethod
-    def from_array(cls, array, shapes, order='C', convert_arrays=True, greedy=False, nested=True):
-        
-        # Concatenate shapes tuple into a single arraytainer:
-        if not isinstance(shapes, tuple):
-            shapes = tuple([shapes])
-        shapes = cls._concatenate_elements_to_array(shapes)
-
-        if not isinstance(shapes, Arraytainer):
-            raise ValueError('shapes must container at least one arraytainer.')
-            
+    def from_array(cls, array, shapes, order='C'):
+        # Concatenate shapes tuple into a single arraytainer
+        shapes = cls.by_concatenation(shapes)
         # Ensure correct number of elements in array:
-        total_size = np.prod(shapes).sum_all()
+        total_size = shapes.size
         if total_size != array.size:
-            raise ValueError(f'Array contains {array.size} elements, but shapes '
-                             f'contains {total_size} elements.')
-
+            raise ValueError(f"""Array contains {array.size} elements, but shapes 
+                                 contains {total_size} elements.""")
         vector = array.flatten(order=order)
-        contents = cls._create_contents_from_vector(vector, shapes, order)
-
-        return cls(contents, convert_arrays, greedy, nested)
+        contents, _ = cls._create_contents_from_vector(vector, shapes, order)
+        return cls(contents)
 
     @classmethod
-    def _concatenate_elements_to_array(cls, val_tuple):
-        
-        val_list = list(val_tuple)
+    def _create_contents_from_vector(cls, vector, shapes, order, vector_idx=None):
+        if vector_idx is None:
+            vector_idx = 0
+        contents = {}
+        for key, shape in shapes.items():
+            if isinstance(shape, Arraytainer):
+                contents[key], vector_idx = cls._create_contents_from_vector(vector, shape, order, vector_idx)
+            else:
+                num_elem = shape.prod(dtype=int)
+                array_vals = vector[vector_idx:vector_idx+num_elem]
+                vector_idx = vector_idx + num_elem
+                new_contents[key] = array_vals.reshape(shape, order=order)
+        if shapes.contents_type is list:
+            contents = list(contents.values())
+        return contents, vector_idx
 
-        for idx, val_i in enumerate(val_list):
-            
-            if not isinstance(val_i, (Arraytainer, *cls._arrays)):
-                val_i = cls._convert_to_array(val_i)
+    @classmethod
+    def by_concatenation(cls, values, dtype=None):
+        if not isinstance(values, (list, tuple)):
+            values = [values]
+        val_is_arraytainer = [isinstance(val, Arraytainer) for val in values]
+        if not any(val_is_arraytainer):
+            raise ValueError('Must contain at least one arraytainer.')
+        to_concat = []
+        for idx, val_i in enumerate(values):
+            if isinstance(val_i, Arraytainer):
+                val_i = np.atleast_1d(val_i)
+            elif not cls.is_array(val_i):
+                val_i = cls.create_array(val_i, dtype)
                 # Shape arrays must have at least one dimension for concatenate:
                 if val_i.ndim == 0:
                     val_i = val_i[None]
+            to_concat.append(val_i)
+        concatenated = np.concatenate(to_concat)
+        return concatenated
 
-            elif isinstance(val_i, Arraytainer):
-                # 0 dimensional arrays in arraytainer cause concatenate to throw errors:
-                val_i = np.atleast_1d(val_i)
+    def __len__(self):
+        return len(self._contents)
 
-            val_list[idx] = val_i
+    def __repr__(self):
+        return f"{self.__class__.__name__}({repr(self.unpack())})"
 
-        return np.concatenate(val_list)
-
-    @classmethod
-    def _create_contents_from_vector(cls, vector, shapes, order, elem_idx=None, first_call=True):
-
-        if elem_idx is None:
-            elem_idx = 0
-
-        new_contents = {}
-        for key, shape in shapes.items():
-            if isinstance(shape, Arraytainer):
-                new_contents[key], elem_idx = cls._create_contents_from_vector(vector, shape, order, elem_idx, first_call=False)
-            else:
-                array_vals, elem_idx = cls._extract_array_vals(vector, elem_idx, shape)
-                new_contents[key] = array_vals.reshape(shape, order=order)
-
-        if shapes._type is list:
-            new_contents = list(new_contents.values())
-
-        if first_call:
-            output = new_contents
-        else:
-            output = (new_contents, elem_idx)
-        
-        return output
- 
-    @staticmethod
-    def _extract_array_vals(vector, elem_idx, shape):
-        # Jaxtainer version of this method uses jnp methods instead of np:
-        num_elem = np.prod(shape)
-        array_vals = vector[elem_idx:elem_idx+num_elem]
-        elem_idx += num_elem
-        return array_vals, elem_idx
-
-    #
-    #   Array Conversion Methods
-    #
-
-    @staticmethod
-    def _convert_to_array(val):
-        # Note that Jaxtainer uses jnp.array:
-        return np.array(val)
-
-    def _convert_contents_to_arrays(self, contents, greedy):
-
-        contents = self._unpack_if_arraytainer(contents)
-        if isinstance(contents, tuple):
-            contents = list(contents)
-
-        contents_iter = contents.items() if isinstance(contents, dict) else enumerate(contents)
-
-        for key, val in contents_iter:
-            val = self._unpack_if_arraytainer(val)
-
-            if isinstance(val, dict):
-                contents[key] = self._convert_contents_to_arrays(val, greedy)
-
-            elif isinstance(val, (list, tuple)):
-                
-                # Check before altering contents on val:
-                any_arrays_in_val = any(isinstance(val_i, self._arrays) for val_i in val)
-
-                # List of numbers should be directly converted to an array:
-                if all(isinstance(val_i, numbers.Number) for val_i in val):
-                    converted_vals = self._convert_to_array(val)
-                else:
-                    converted_vals = self._convert_contents_to_arrays(val, greedy)
-            
-                if not greedy and self._can_combine_list_into_single_array(converted_vals, any_arrays_in_val):
-                    converted_vals = self._convert_to_array(converted_vals)
-
-                contents[key] = converted_vals
-
-            else:
-                contents[key] = self._convert_to_array(val)
-
-        return contents
-
-    @staticmethod
-    def _unpack_if_arraytainer(val):
-        if isinstance(val, Arraytainer):
-            val = val.unpack()
-        return val
-
-    def _can_combine_list_into_single_array(self, converted_list, any_arrays_in_val):
-        can_convert = not any_arrays_in_val and \
-                      self._all_elems_are_arrays(converted_list) and \
-                      self._all_arrays_of_equal_shape(converted_list)
-        return can_convert
-
-    def _all_elems_are_arrays(self, converted_list):
-        return all(isinstance(val_i, self._arrays) for val_i in converted_list)
-
-    def _all_arrays_of_equal_shape(self, converted_list):
-        # Converted list could be empty:
-        if converted_list:
-            first_array_shape = converted_list[0].shape
-            all_equal = all(array_i.shape == first_array_shape for array_i in converted_list)
-        else:
-            all_equal = True
-        return all_equal
-
-    #
-    #   Getter Methods
-    #
+    def __iter__(self):
+        return self.values()
 
     def __getitem__(self, key):
-        if isinstance(key, self._arrays) or self._is_slice(key):
+        if isinstance(key, Arraytainer):
+            item = self._get_with_arraytainer(key)
+        elif self.is_array(key) or self.is_slice(key):
             item = self._get_with_array(key)
         else:
-            item = super().__getitem__(key, greedy=True)
+            item = self._get_with_regular_key(key)
         return item
-    
-    def _get_with_array(self, array_key):
-        item = {key: self._contents[key][array_key] for key in self.keys()}
-        if self._type is list:
-            item = list(item.values())
-        return self.__class__(item, greedy=True)
 
-    #
-    #   Setter Methods
-    #
-
-    def update(self, new_elem, *key_iterable):
-        new_elem = self._convert_to_array_or_arraytainer(new_elem)
-        super().update(new_elem, *key_iterable)
-
-    def assign(self, new_val, *key_iterable):
+    def __setitem__(self, key, new_val):
+        if isinstance(key, tuple):
+            raise KeyError('Cannot use a tuple as an Arraytainer key.')
         new_val = self._convert_to_array_or_arraytainer(new_val)
-        super().assign(new_val, *key_iterable)
-
-    def _convert_to_array_or_arraytainer(self, val):
-        if isinstance(val, numbers.Number):
-            val = self._convert_to_array(val)
-        if not isinstance(val, self._arrays):
-            val = self.__class__(val)
-        return val
-
-    def __setitem__(self, key, new_value):
-        if isinstance(key, self._arrays) or self._is_slice(key):
-            self._set_with_array(key)
+        if self.is_array(key) or self.is_slice(key):
+            self._set_with_array(key, new_val)
         elif isinstance(key, Arraytainer):
-            self._set_with_arraytainer(key, new_value)
+            self._set_with_arraytainer(key, new_val)
         else:
-            super().__setitem__(key, new_value)
+            self._set_with_regular_key(key, new_val)
+
+    def __array_function__(self, func, types, args, kwargs):
+        fun_return = self._manage_func_call(func, types, *args, **kwargs)
+        return fun_return
+
+    def __array_ufunc__(self, ufunc, method, *args, **kwargs):
+        fun_return = self._manage_func_call(ufunc, method, *args, **kwargs)
+        return fun_return
+
+    def copy(self):
+        return copy.copy(self)
+
+    def deepcopy(self):
+        return copy.deepcopy(self)
 
     @staticmethod
-    def _is_slice(val):
+    def _deepcopy_contents(contents):
+        return copy.deepcopy(contents)
+
+    def keys(self):
+        if self.contents_type is dict:
+            keys = self._contents.keys()
+        else:
+            keys = range(len(self._contents))
+        return keys
+
+    def values(self):
+        return (self._contents[key] for key in self.keys())
+
+    def items(self):
+        return ((key, self._contents[key]) for key in self.keys())
+
+    def append(self, new_val, *key_iterable):
+        if self.contents_type is not list:
+            raise AttributeError("""Can't append to dictionary-like Arraytainer; 
+            use update method instead.""") 
+        new_val = self._convert_to_array_or_arraytainer(new_val)
+        key_iterable = list(key_iterable)
+        key = key_iterable.pop(0)
+        if key_iterable:
+            self[key].append(new_val, *key_iterable)
+        else:
+            self._contents.append(new_val)
+                
+    def update(self, new_val, *key_iterable):
+        if self.contents_type is not dict:
+            raise TypeError('''Can't update a list-like Arraytainer; 
+            use the append method instead.''')
+        new_val = self._convert_to_array_or_arraytainer(new_val)
+        key_iterable = list(key_iterable)
+        key = key_iterable.pop(0)
+        if key_iterable:
+            self[key].update(new_val, *key_iterable)
+        else:
+            self[key]._contents.update(new_val)
+
+    def _get_with_arraytainer(self, arraytainer_key):
+        item = {}
+        for key, val in arraytainer_key.items():
+            try:
+                item[key] = self._contents[key][val]
+            except KeyError:
+                raise KeyError("""must contain same key values as arraytainer. """)
+        if self.contents_type is not list:
+            item = list(item.values())
+        return self.__class__(item)   
+
+    def _get_with_array(self, array_key):
+        item = {key: self._contents[key][array_key] for key in self.keys()}
+        if self.contents_type is list:
+            item = list(item.values())
+        return self.__class__(item)
+
+    def _get_with_regular_key(self, key):
+        try:
+            item = self._contents[key]
+        except KeyError:
+            raise KeyError(f"""{key} is not a key in this {self.__class__.__name__}; valid keys are: {', '.join(self.keys())}.""")
+        return item
+
+    @property
+    def contents(self):
+        return self._contents
+
+    @property
+    def contents_type(self):
+        return type(self._contents)
+
+    @property
+    def sizes(self):
+        return np.prod(self.shape, dtype=int)
+
+    @property
+    def first_array(self):
+        return self.get_first_array()
+
+    def unpack(self):
+        unpacked = []
+        for val in self.values():
+            if isinstance(val, Arraytainer):
+                unpacked.append(val.unpack())
+            else:
+                unpacked.append(val)
+        if self.contents_type is dict:
+            unpacked = dict(zip(self.keys(), unpacked))
+        return unpacked
+
+    def list_arrays(self):
+        return self._recursively_get_arrays()
+
+    def get_first_array(self):
+        first_val = next(self.values())
+        if isinstance(first_val, Arraytainer):
+            first_val = first_val.get_first_array()
+        return first_val
+
+    def _recursively_get_arrays(self, array_list=None):
+        if array_list is None:
+            array_list = []
+        for val in self.values():
+            if isinstance(val, Arraytainer):
+                array_list = val._recursively_get_arrays(array_list)
+            else:
+                array_list.append(val)
+        return array_list
+    
+    def all(self):
+        for key in self.keys():
+            if not self._contents[key].all():
+                return False
+        return True
+
+    def any(self):
+        for key in self.keys():
+            if self._contents[key].any():
+                return True
+        return False
+
+    def sum_elems(self):
+        return sum(self.values())
+
+    def sum_arrays(self):
+        return sum(self.list_arrays())
+
+    def sum(self):
+        arraytainer_of_scalars = np.sum(self)
+        return sum(arraytainer_of_scalars.list_arrays())
+
+    def reshape(self, new_shapes, order='C'):
+        if not isinstance(new_shapes, (tuple, list)):
+            new_shapes = (new_shapes,)
+        is_arraytainer = [isinstance(shape, Arraytainer) for shape in new_shapes]
+        if any(is_arraytainer) and not all(is_arraytainer):
+            new_shapes = self.__class__.by_concatenation(new_shapes)
+        return np.reshape(self, new_shapes, order=order)
+
+    def flatten(self, order='C', return_array=True):
+        output = np.squeeze(np.ravel(self, order=order))
+        if return_array:
+            # Zero-dimensional elements cause concatenate to throw error:
+            elem_list = output.list_arrays()
+            for idx, elem in enumerate(elem_list):
+                if elem.ndim == 0:
+                    elem_list[idx] = elem[None]
+            output = np.concatenate(elem_list)
+        return output
+
+    def tolist(self):
+        output = {}
+        for key, val in self.items():
+            if self.is_array(val) or isinstance(val, Arraytainer):
+                output[key] = val.tolist()
+            else:
+                output[key] = val
+        if self.contents_type is list:
+            output = list(output.values())
+        return output
+
+    @property
+    def T(self):
+        return np.transpose(self)
+
+    @property
+    def shape(self):
+        shapes = {}
+        for key, val in self.items():
+            shapes[key] = val.shape
+        if self.contents_type is list:
+            shapes = list(shapes.values())
+        return self.__class__(shapes)
+
+    @property
+    def ndim(self):
+        return np.ndim(self)
+
+    @property
+    def size(self):
+        return self.sizes.sum_all()
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    def _set_with_array(self, array_key, new_value):
+        for key in self.keys():
+            if isinstance(new_value, Arraytainer):
+                value_i = new_value[key]
+            # Note that Jaxtainers use different _set_array_values method:
+            self._set_array_values(key, array_key, value_i)
+
+    def _set_array_values(self, key, idx, new_value):
+        self._contents[key][idx] = new_value
+
+    def _set_with_arraytainer(self, arraytainer_key, new_value):
+        for key, val in arraytainer_key.items():
+            if isinstance(new_value, Arraytainer):
+                new_value_i = new_value[key]
+            if isinstance(val, self._arrays):
+                self._set_array_values(key, val, new_value_i)
+            else:
+                self._contents[key][val] = new_value_i
+
+    def _set_with_regular_key(self, key, new_val):
+        try:
+            self._contents[key] = new_val
+        except IndexError as e:
+            if self.contents_type is list:
+                raise TypeError("""Unable to new assign items to a list-like Arraytainer;
+                                use the append method instead.""")
+            raise e
+
+    def _convert_to_array_or_arraytainer(self, val):
+        if not (self.is_array(val) or isinstance(val, Arraytainer)):
+            if isinstance(val, (list, dict)):
+                val = self.__class__(val, dtype=self._dtype)
+            else:
+                val = self.create_array(val, dtype=self._dtype)
+        return val
+
+
+    def _manage_func_call(self, func, types, *args, **kwargs):
+        arraytainer_list = self._list_arraytainers_in_args(args) + self._list_arraytainers_in_args(kwargs)
+        largest_arraytainer = max(arraytainer_list, key=len)
+        self._check_arg_compatability(arraytainer_list, largest_arraytainer)
+        shared_keyset = self._get_shared_keyset(arraytainer_list)
+        func_return = copy.deepcopy(largest_arraytainer.contents)
+        for key in shared_keyset:
+            args_i = self._prepare_func_args(args, key)
+            kwargs_i = self._prepare_func_args(kwargs, key)
+            func_return[key] = func(*args_i, **kwargs_i)
+
+        return self.__class__(func_return)
+
+    def _list_arraytainers_in_args(self, args):
+        args_iter = args.values() if isinstance(args, dict) else args
+        args_arraytainers = []
+        for arg_i in args_iter:
+            if isinstance(arg_i, Arraytainer):
+                args_arraytainers.append(arg_i)
+            # Could have an arraytainer in a list in a tuple (e.g. np.concatenate):
+            elif isinstance(arg_i, (list, tuple, dict)):
+                args_arraytainers += self._list_arraytainers_in_args(arg_i)
+        return args_arraytainers
+
+    def _check_arg_compatability(self, arraytainer_list, largest_arraytainer):
+        largest_keyset = set(largest_arraytainer.keys())
+        for arraytainer in arraytainer_list:
+            if arraytainer.contents_type != largest_arraytainer.contents_type:
+                raise KeyError("""Arraytainers being combined through operations 
+                must be all dictionary-like or all list-like""")
+            keyset = set(arraytainer.keys())
+            if not keyset.issubset(largest_keyset):
+                raise KeyError(f"""Keys of arraytainer argument (= {keyset}) are not 
+                a subset of the keys of the largest Arraytainer (={largest_keyset}) it's being combined with.""")
+    
+    @staticmethod
+    def _get_shared_keyset(arraytainer_list):
+        return set.intersection(*[set(arraytainer.keys()) for arraytainer in arraytainer_list])
+
+    def _prepare_func_args(self, args, key):
+        args_iter = args.items() if isinstance(args, dict) else enumerate(args)
+        prepped_args = {}
+        for arg_key, arg in args_iter:
+            if isinstance(arg, Arraytainer):
+                # Skip over this arg if doesn't include key:
+                if key in arg.keys():
+                    prepped_args[arg_key] = arg[key]
+            # Tuple args may contain arryatainer entries:
+            elif isinstance(arg, (tuple, list, dict)):
+                prepped_args[arg_key] = self._prepare_func_args(arg, key)
+            else:
+                prepped_args[arg_key] = arg
+        if not isinstance(args, dict):
+            prepped_args = tuple(prepped_args.values())
+        return prepped_args
+
+    @staticmethod
+    def is_slice(val):
         if isinstance(val, slice):
             is_slice = True
         # Slices accross multiple dimensions appear as tuples of ints/slices/Nones (e.g. my_array[3, 1:2, :])
@@ -225,193 +417,38 @@ class Arraytainer(Contents, np.lib.mixins.NDArrayOperatorsMixin):
             is_slice = False
         return is_slice
 
-    def _set_with_array(self, array_key, new_value):
-        for key in self.keys():
-            value_i = new_value[key] if isinstance(new_value, Arraytainer) else new_value
-            # Note that Jaxtainers use different _set_array_values method:
-            self._set_array_values(key, array_key, value_i)
+    @staticmethod
+    def is_array(val):
+        return isinstance(val, np.ndarray)
 
-    def _set_array_values(self, key, idx, new_value):
-        self._contents[key][idx] = new_value
+    @staticmethod
+    def create_array(val, dtype=None):
+        return np.array(val, dtype=dtype)
 
-    def _set_with_arraytainer(self, arraytainer_key, new_value):
-        for key, val in arraytainer_key.items():
-            new_value_i = new_value[key] if isinstance(new_value, Arraytainer) else new_value
-            if isinstance(val, self._arrays):
-                self._set_array_values(key, val, new_value_i)
-            else:
-                self._contents[key][val] = new_value_i
+    def _recursive_arraytainer_conversion(self, contents, dtype, array_conversions=True):
+        items = contents.items() if isinstance(contents, dict) else enumerate(contents)
+        for key, val in items:
+            if isinstance(val, Arraytainer):
+                continue
+            elif isinstance(val, (list, dict)):
+                contents[key] = self.__class__(val, array_conversions, dtype)
+            elif array_conversions:
+                contents[key] = self.create_array(val, dtype)
+        return contents
 
-    #
-    #   Array Methods and Properties
-    #
+    def squeeze(self, axis=None):
+        return np.squeeze(self, axis=axis)
 
-    @property
-    def T(self):
+    def swapaxes(self, axis1, axis2):
+        return np.swapaxes(self, axis1, axis2)
+
+    def transpose(self):
         return np.transpose(self)
-    
-    def all(self):
-        for key in self.keys():
-            # Numpy/Jax arrays also have an 'all' method:
-            if not self.contents[key].all():
-                return False
-        return True
 
-    def any(self):
-        for key in self.keys():
-            if self.contents[key].any():
-                return True
-        return False
-
-    def sum(self):
-        return sum(self.values())
-
-    def sum_arrays(self):
-        return sum(self.list_elements())
-
-    def sum_all(self):
-        arraytainer_of_scalars = np.sum(self)
-        return sum(arraytainer_of_scalars.list_elements())
-
-    def get_shape(self, return_tuples=False):
-        
-        shapes = {}
-        for key, val in self.items():
-            shapes[key] = val.shape
-        
-        if self._type is list:
-            shapes = list(shapes.values())
-
-        if not return_tuples:
-            shapes = self.__class__(shapes, greedy=True)
-
-        return shapes
-
-    #
-    #   Array-Like Methods
-    #
-
-    @property
-    def shape(self):
-        return self.get_shape()
-
-    @property
-    def ndim(self):
-        return np.ndim(self)
-
-    @property
-    def sizes(self):
-        return np.prod(self.shape)
-
-    @property
-    def size(self):
-        size = self.sizes.sum_all()
-        if isinstance(size, self._arrays):
-            size = size.item()
-        return size
-
-    def reshape(self, *new_shapes, order='C'):
-        new_shapes = self._concatenate_elements_to_array(new_shapes)
-        return np.reshape(self, new_shapes, order=order)
-
-    def flatten(self, order='C', return_array=True):
-        output = np.squeeze(np.ravel(self, order=order))
-        if return_array:
-            # Zero-dimensional elements cause concatenate to throw error:
-            elem_list = output.list_elements()
-            for idx, elem in enumerate(elem_list):
-                if elem.ndim == 0:
-                    elem_list[idx] = elem[None]
-            output = np.concatenate(elem_list)
-        return output
-
-    #
-    #   Numpy Function Handling Methods
-    #
-
-    def __array_function__(self, func, types, args, kwargs):
-        fun_return = self._manage_func_call(func, types, *args, **kwargs)
-        return fun_return
-
-    def __array_ufunc__(self, ufunc, method, *args, **kwargs):
-        fun_return = self._manage_func_call(ufunc, method, *args, **kwargs)
-        return fun_return
-
-    def _manage_func_call(self, func, types, *args, **kwargs):
-
-        arraytainer_list = self._list_arraytainers_in_args(args) + self._list_arraytainers_in_args(kwargs)
-        largest_arraytainer = self._find_largest_arraytainer(arraytainer_list)
-        self._check_arraytainer_arg_compatability(arraytainer_list, largest_arraytainer)
-        shared_keyset = self._get_shared_keyset(arraytainer_list)
-
-        func_return = copy.deepcopy(largest_arraytainer.contents)
-        for key in shared_keyset:
-            args_i = self._prepare_func_args(args, key)
-            kwargs_i = self._prepare_func_args(kwargs, key)
-            func_return[key] = func(*args_i, **kwargs_i)
-
-        return self.__class__(func_return, greedy=True)
-
-    @staticmethod
-    def _list_arraytainers_in_args(args):
-        args_iter = args.values() if isinstance(args, dict) else args
-        args_arraytainers = []
-        for arg_i in args_iter:
-            if isinstance(arg_i, Arraytainer):
-                args_arraytainers.append(arg_i)
-            # Could have an arraytainer in a list in a tuple (e.g. np.concatenate):
-            elif isinstance(arg_i, (list, tuple, dict)):
-                args_arraytainers += Arraytainer._list_arraytainers_in_args(arg_i)
-        
-        return args_arraytainers
-
-    @staticmethod
-    def _find_largest_arraytainer(arraytainer_list):
-        largest_len = -1
-        for arraytainer in arraytainer_list:
-            if len(arraytainer) > largest_len:
-                largest_len = len(arraytainer)
-                largest_arraytainer = arraytainer
-        return largest_arraytainer
-
-    def _check_arraytainer_arg_compatability(self, arraytainer_list, largest_arraytainer):
-
-        largest_keyset = set(largest_arraytainer.keys())
-            
-        for arraytainer_i in arraytainer_list:
-            
-            if arraytainer_i._type != largest_arraytainer._type:
-                raise KeyError('Arraytainers being combined through operations must'
-                               'be all dictionary-like or all list-like')
-            
-            ith_keyset = set(arraytainer_i.keys())
-            if not ith_keyset.issubset(largest_keyset):
-                raise KeyError(f'Keys of an Arraytainer (= {ith_keyset}) is not a subset of the '
-                               f"keys of a larger Arraytainer (={largest_keyset}) it's being combined with.")
-    
-    @staticmethod
-    def _get_shared_keyset(arraytainer_list):
-        return set.intersection(*[set(arraytainer.keys()) for arraytainer in arraytainer_list])
-
-
-    @staticmethod
-    def _prepare_func_args(args, key):
-        
-        args_iter = args.items() if isinstance(args, dict) else enumerate(args)
-        
-        prepped_args = {}
-        for arg_key, arg in args_iter:
-            if isinstance(arg, Arraytainer):
-                # Skip over this arg if doesn't include key:
-                if key in arg.keys():
-                    prepped_args[arg_key]  = arg[key]
-            # Tuple args may contain arryatainer entries:
-            elif isinstance(arg, (tuple, list, dict)):
-                prepped_args[arg_key] = Arraytainer._prepare_func_args(arg, key)
-            else:
-                prepped_args[arg_key] = arg
-
-        if not isinstance(args, dict):
-            prepped_args = tuple(prepped_args.values())
-
-        return prepped_args
+    def resize(self, new_shapes):
+        if not isinstance(new_shapes, (tuple, list)):
+            new_shapes = (new_shapes,)
+        is_arraytainer = [isinstance(shape, Arraytainer) for shape in new_shapes]
+        if any(is_arraytainer) and not all(is_arraytainer):
+            new_shapes = self.__class__.by_concatenation(new_shapes)
+        return np.resize(self, new_shapes)
