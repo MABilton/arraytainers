@@ -375,7 +375,6 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
             args_i = self._prepare_func_args(args, key)
             kwargs_i = self._prepare_func_args(kwargs, key)
             func_return[key] = func(*args_i, **kwargs_i)
-
         return self.__class__(func_return)
 
     def _list_arraytainers_in_args(self, args):

@@ -4,10 +4,10 @@ import jax.numpy as jnp
 import copy
 
 def assert_equal(output, expected, approx_equal=False):
-    if isinstance(expected, (np.ndarray, jnp.ndarray)):
-        assert_arrays_equal(output, expected, approx_equal)
-    else:
+    if isinstance(expected, (list, dict, Arraytainer)):
         assert_contents_equal(output, expected, approx_equal)
+    else:
+        assert_arrays_equal(output, expected, approx_equal)
 
 def assert_arrays_equal(output, expected, approx_equal=False):
     assert isinstance(output, (np.ndarray, jnp.ndarray))
