@@ -11,15 +11,8 @@ _JNP_SUBMODULES = (jnp, *[module for _, module in getmembers(jnp, ismodule)])
 @register_pytree_node_class
 class Jaxtainer(Arraytainer):
 
-    def __init__(self, contents, dtype=None, array_conversions=True):
-        if not isinstance(contents, (list, dict)):
-            raise ValueError(f'contents must be either a list or a dict, not a {type(contents)}.')
-        contents = self._deepcopy_contents(contents)
-        if isinstance(contents, dict) and self._keys_contain_tuple(contents):
-            raise KeyError("contents.keys() contains a tuple, which isn't allowed in an Arraytainer.")
-        contents = self._recursive_arraytainer_conversion(contents, dtype, array_conversions)
-        self._contents = contents
-        self._dtype = dtype
+    def __init__(self, contents, array_conversions=True, dtype=None):
+        super().__init__(contents, array_conversions=array_conversions, dtype=dtype)
 
     #
     #   Overridden Methods
@@ -45,8 +38,8 @@ class Jaxtainer(Arraytainer):
         deepcopied_contents = self._deepcopy_contents(self._contents)
         return self.__class__(deepcopied_contents)
 
-    def _set_array_values(self, key, idx, value):
-        self._contents[key] = self.contents[key].at[idx].set(value)
+    def _set_array_values(self, key, mask, value):
+        self._contents[key] = self._contents[key].at[mask].set(value)
 
     @staticmethod
     def create_array(val, dtype=None):

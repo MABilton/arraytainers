@@ -99,8 +99,6 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return item
 
     def __setitem__(self, key, new_val):
-        if isinstance(key, tuple):
-            raise KeyError('Cannot use a tuple as an Arraytainer key.')
         new_val = self._convert_to_array_or_arraytainer(new_val)
         if self.is_array(key) or self.is_slice(key):
             self._set_with_array(key, new_val)
@@ -167,11 +165,12 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     def _get_with_arraytainer(self, arraytainer_key):
         item = {}
         for key, val in arraytainer_key.items():
-            try:
-                item[key] = self._contents[key][val]
-            except KeyError:
-                raise KeyError("""must contain same key values as arraytainer. """)
-        if self.contents_type is not list:
+            if key not in self.keys():
+                raise KeyError("Arraytainer index contains keys not found in original Arraytainer.")
+            if self.is_array(self._contents[key]) and isinstance(val, Arraytainer):
+                raise KeyError("Arraytainer index contains keys not found in original Arraytainer.")
+            item[key] = self._contents[key][val]
+        if self.contents_type is list:
             item = list(item.values())
         return self.__class__(item)   
 
@@ -184,8 +183,9 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     def _get_with_regular_key(self, key):
         try:
             item = self._contents[key]
-        except KeyError:
-            raise KeyError(f"""{key} is not a key in this {self.__class__.__name__}; valid keys are: {', '.join(self.keys())}.""")
+        except (IndexError, KeyError):
+            key_strs = [str(key_i) for key_i in self.keys()]
+            raise KeyError(f"""{key} is not a key in this Arraytainer; valid keys are: {', '.join(key_strs)}.""")        
         return item
 
     @property
@@ -311,31 +311,48 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     def dtype(self):
         return self._dtype
 
-    def _set_with_array(self, array_key, new_value):
-        for key in self.keys():
-            if isinstance(new_value, Arraytainer):
-                value_i = new_value[key]
-            # Note that Jaxtainers use different _set_array_values method:
-            self._set_array_values(key, array_key, value_i)
+    def _set_with_array(self, array, new_val):
+        if isinstance(new_val, Arraytainer):
+            for key in new_val.keys():
+                if (key not in self.keys()):
+                    raise KeyError('New Arraytainer value to set contains keys not found in the original Arraytainer.')
+                if self.is_array(self._contents[key]) and (not self.is_array(new_val[key])):
+                    raise KeyError('New Arraytainer value to set contains keys not found in the original Arraytainer.')
+                elif self.is_array(self._contents[key]):
+                    self._set_array_values(key, array, new_val[key])      
+                else:
+                    self[key][array] = new_val[key]
+        else:
+            for key in self.keys():
+                if self.is_array(self._contents[key]):
+                    self._set_array_values(key, array, new_val) 
+                else:
+                    self[key][array] = new_val
 
-    def _set_array_values(self, key, idx, new_value):
-        self._contents[key][idx] = new_value
+    def _set_array_values(self, key, mask, new_value):
+        self._contents[key][mask] = new_value
 
-    def _set_with_arraytainer(self, arraytainer_key, new_value):
-        for key, val in arraytainer_key.items():
-            if isinstance(new_value, Arraytainer):
-                new_value_i = new_value[key]
-            if isinstance(val, self._arrays):
-                self._set_array_values(key, val, new_value_i)
-            else:
-                self._contents[key][val] = new_value_i
+    def _set_with_arraytainer(self, arraytainer, new_val):
+        for key, mask in arraytainer.items():
+            self_val = self._contents[key]
+            if isinstance(self_val, Arraytainer) and isinstance(new_val, Arraytainer):
+                self._contents[key][mask] = new_val._contents[key]
+            elif isinstance(self_val, Arraytainer) and self.is_array(new_val):
+                self._contents[key][mask] = new_val
+            elif self.is_array(self_val) and self.is_array(new_val):
+                self._set_array_values(key, mask, new_val)
+            elif self.is_array(self_val) and isinstance(new_val, Arraytainer):                
+                if (key not in new_val.keys()) or (not self.is_array(new_val[key])):
+                    raise KeyError('New Arraytainer value to set contains keys not found in the original Arraytainer.')
+                self._set_array_values(key, mask, new_val[key]) 
+                
 
     def _set_with_regular_key(self, key, new_val):
         try:
             self._contents[key] = new_val
         except IndexError as e:
             if self.contents_type is list:
-                raise TypeError("""Unable to new assign items to a list-like Arraytainer;
+                raise KeyError("""Unable to new assign items to a list-like Arraytainer;
                                 use the append method instead.""")
             raise e
 
