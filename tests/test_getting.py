@@ -287,7 +287,7 @@ def test_getting_with_nested_jaxtainer_using_successive_regular_keys(key_tuple, 
     helpers.assert_equal(gotten_val, expected)
 
 key_error_contents = {'a': [0, 1], 'b': {'a':2, 'b':3}}
-@pytest.mark.parametrize("key_tuple", [('c',), ('b',0), ('a',2), ('b','c')])
+@pytest.mark.parametrize("key_tuple", [('c',), ('b',0), ('a',2), ('b',0), ('a','b')])
 def test_arraytainer_getting_error_invalid_key(key_tuple):
     arraytainer = Arraytainer(key_error_contents)
     with pytest.raises(KeyError, match="not a key in this Arraytainer"):
@@ -297,7 +297,7 @@ def test_arraytainer_getting_error_invalid_key(key_tuple):
 
 
 jax_key_error_contents = {'a': [0, 1], 'b': {'a':2, 'b':3}}
-@pytest.mark.parametrize("key_tuple", [('c',), ('b',0), ('a',2), ('b','c')])
+@pytest.mark.parametrize("key_tuple", [('c',), ('b',0), ('a',2), ('b',0), ('a','b')])
 def test_jaxtainer_getting_error_invalid_key(key_tuple):
     jaxtainer = Jaxtainer(jax_key_error_contents)
     with pytest.raises(KeyError, match="not a key in this Arraytainer"):

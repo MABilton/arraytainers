@@ -183,7 +183,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     def _get_with_regular_key(self, key):
         try:
             item = self._contents[key]
-        except (IndexError, KeyError):
+        except (IndexError, KeyError, TypeError):
             key_strs = [str(key_i) for key_i in self.keys()]
             raise KeyError(f"""{key} is not a key in this Arraytainer; valid keys are: {', '.join(key_strs)}.""")        
         return item
@@ -256,23 +256,22 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         arraytainer_of_scalars = np.sum(self)
         return sum(arraytainer_of_scalars.list_arrays())
 
-    def reshape(self, new_shapes, order='C'):
-        if not isinstance(new_shapes, (tuple, list)):
-            new_shapes = (new_shapes,)
-        is_arraytainer = [isinstance(shape, Arraytainer) for shape in new_shapes]
-        if any(is_arraytainer) and not all(is_arraytainer):
-            new_shapes = self.__class__.by_concatenation(new_shapes)
+    def reshape(self, *new_shapes, order='C'):
+        if len(new_shapes)==1:
+            new_shapes = new_shapes[0]
+        if not isinstance(new_shapes, Arraytainer):
+            is_arraytainer = [isinstance(shape, Arraytainer) for shape in new_shapes]
+            if any(is_arraytainer) and not all(is_arraytainer):
+                new_shapes = self.__class__.by_concatenation(new_shapes)
         return np.reshape(self, new_shapes, order=order)
 
-    def flatten(self, order='C', return_array=True):
+    def flatten(self, order='C'):
         output = np.squeeze(np.ravel(self, order=order))
-        if return_array:
-            # Zero-dimensional elements cause concatenate to throw error:
-            elem_list = output.list_arrays()
-            for idx, elem in enumerate(elem_list):
-                if elem.ndim == 0:
-                    elem_list[idx] = elem[None]
-            output = np.concatenate(elem_list)
+        elem_list = output.list_arrays()
+        for idx, elem in enumerate(elem_list):
+            if elem.ndim == 0:
+                elem_list[idx] = elem[None]
+        output = np.concatenate(elem_list)
         return output
 
     def tolist(self):
@@ -305,7 +304,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     @property
     def size(self):
-        return self.sizes.sum_all()
+        return sum(array.size for array in self.list_arrays())
 
     @property
     def dtype(self):
@@ -411,9 +410,14 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
                 # Skip over this arg if doesn't include key:
                 if key in arg.keys():
                     prepped_args[arg_key] = arg[key]
-            # Tuple args may contain arryatainer entries:
+            # Tuple args may contain arraytainer entries:
             elif isinstance(arg, (tuple, list, dict)):
-                prepped_args[arg_key] = self._prepare_func_args(arg, key)
+                prepped_arg = self._prepare_func_args(arg, key)
+                # Remove redundant tuple wrapping (i.e. single tuple wrapped in tuple);
+                # required for arraytainer.reshape((new_shape_arraytainer,))
+                if isinstance(prepped_arg, (tuple,list)) and len(prepped_arg)==1:
+                    prepped_arg = prepped_arg[0]
+                prepped_args[arg_key] = prepped_arg
             else:
                 prepped_args[arg_key] = arg
         if not isinstance(args, dict):
