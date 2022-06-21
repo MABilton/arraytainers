@@ -6,10 +6,11 @@ import numpy as np
 
 class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
-    def __init__(self, contents, array_conversions=True, dtype=None):
+    def __init__(self, contents, array_conversions=True, dtype=None, deepcopy=True):
         if not isinstance(contents, (list, dict)):
             raise ValueError(f'contents must be either a list or a dict, not a {type(contents)}.')
-        contents = self._deepcopy_contents(contents)
+        if deepcopy:
+            contents = self._deepcopy_contents(contents)
         if isinstance(contents, dict) and self._keys_contain_tuple(contents):
             raise KeyError("contents.keys() contains a tuple, which isn't allowed in an Arraytainer.")
         contents = self._recursive_arraytainer_conversion(contents, dtype, array_conversions)
@@ -40,22 +41,22 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
             raise ValueError(f"""Array contains {array.size} elements, but shapes 
                                  contains {total_size} elements.""")
         vector = array.flatten(order=order)
-        contents, _ = cls._create_contents_from_vector(vector, shapes, order)
+        contents, _ = cls._createcontents_from_vector(vector, shapes, order)
         return cls(contents)
 
     @classmethod
-    def _create_contents_from_vector(cls, vector, shapes, order, vector_idx=None):
+    def _createcontents_from_vector(cls, vector, shapes, order, vector_idx=None):
         if vector_idx is None:
             vector_idx = 0
         contents = {}
         for key, shape in shapes.items():
             if isinstance(shape, Arraytainer):
-                contents[key], vector_idx = cls._create_contents_from_vector(vector, shape, order, vector_idx)
+                contents[key], vector_idx = cls._createcontents_from_vector(vector, shape, order, vector_idx)
             else:
                 num_elem = shape.prod(dtype=int)
                 array_vals = vector[vector_idx:vector_idx+num_elem]
                 vector_idx = vector_idx + num_elem
-                new_contents[key] = array_vals.reshape(shape, order=order)
+                newcontents[key] = array_vals.reshape(shape, order=order)
         if shapes.contents_type is list:
             contents = list(contents.values())
         return contents, vector_idx
@@ -81,7 +82,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return concatenated
 
     def __len__(self):
-        return len(self._contents)
+        return len(self.contents)
 
     def __repr__(self):
         return f"{self.__class__.__name__}({repr(self.unpack())})"
@@ -116,10 +117,17 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return fun_return
 
     def copy(self):
-        return copy.copy(self)
+        contents_copy = copy.copy(self.contents)
+        return self.__class__(contents_copy, deepcopy=False, dtype=self.dtype)
 
     def deepcopy(self):
-        return copy.deepcopy(self)
+        return self.__class__(self.contents, deepcopy=True, dtype=self.dtype)
+
+    def __copy__(self):
+        return self.copy()
+
+    def __deepcopy__(self, memo):
+        return self.deepcopy()
 
     @staticmethod
     def _deepcopy_contents(contents):
@@ -127,16 +135,16 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     def keys(self):
         if self.contents_type is dict:
-            keys = self._contents.keys()
+            keys = self.contents.keys()
         else:
-            keys = range(len(self._contents))
+            keys = range(len(self.contents))
         return keys
 
     def values(self):
-        return (self._contents[key] for key in self.keys())
+        return (self.contents[key] for key in self.keys())
 
     def items(self):
-        return ((key, self._contents[key]) for key in self.keys())
+        return ((key, self.contents[key]) for key in self.keys())
 
     def append(self, new_val, *key_iterable):
         if self.contents_type is not list:
@@ -148,7 +156,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         if key_iterable:
             self[key].append(new_val, *key_iterable)
         else:
-            self._contents.append(new_val)
+            self.contents.append(new_val)
                 
     def update(self, new_val, *key_iterable):
         if self.contents_type is not dict:
@@ -160,29 +168,29 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         if key_iterable:
             self[key].update(new_val, *key_iterable)
         else:
-            self[key]._contents.update(new_val)
+            self[key].contents.update(new_val)
 
     def _get_with_arraytainer(self, arraytainer_key):
         item = {}
         for key, val in arraytainer_key.items():
             if key not in self.keys():
                 raise KeyError("Arraytainer index contains keys not found in original Arraytainer.")
-            if self.is_array(self._contents[key]) and isinstance(val, Arraytainer):
+            if self.is_array(self.contents[key]) and isinstance(val, Arraytainer):
                 raise KeyError("Arraytainer index contains keys not found in original Arraytainer.")
-            item[key] = self._contents[key][val]
+            item[key] = self.contents[key][val]
         if self.contents_type is list:
             item = list(item.values())
         return self.__class__(item)   
 
     def _get_with_array(self, array_key):
-        item = {key: self._contents[key][array_key] for key in self.keys()}
+        item = {key: self.contents[key][array_key] for key in self.keys()}
         if self.contents_type is list:
             item = list(item.values())
         return self.__class__(item)
 
     def _get_with_regular_key(self, key):
         try:
-            item = self._contents[key]
+            item = self.contents[key]
         except (IndexError, KeyError, TypeError):
             key_strs = [str(key_i) for key_i in self.keys()]
             raise KeyError(f"""{key} is not a key in this Arraytainer; valid keys are: {', '.join(key_strs)}.""")        
@@ -194,7 +202,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     @property
     def contents_type(self):
-        return type(self._contents)
+        return type(self.contents)
 
     @property
     def sizes(self):
@@ -236,13 +244,13 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     
     def all(self):
         for key in self.keys():
-            if not self._contents[key].all():
+            if not self.contents[key].all():
                 return False
         return True
 
     def any(self):
         for key in self.keys():
-            if self._contents[key].any():
+            if self.contents[key].any():
                 return True
         return False
 
@@ -304,7 +312,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     @property
     def size(self):
-        return sum(array.size for array in self.list_arrays())
+        return sum(self.create_array(array).size for array in self.list_arrays())
 
     @property
     def dtype(self):
@@ -315,29 +323,29 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
             for key in new_val.keys():
                 if (key not in self.keys()):
                     raise KeyError('New Arraytainer value to set contains keys not found in the original Arraytainer.')
-                if self.is_array(self._contents[key]) and (not self.is_array(new_val[key])):
+                if self.is_array(self.contents[key]) and (not self.is_array(new_val[key])):
                     raise KeyError('New Arraytainer value to set contains keys not found in the original Arraytainer.')
-                elif self.is_array(self._contents[key]):
+                elif self.is_array(self.contents[key]):
                     self._set_array_values(key, array, new_val[key])      
                 else:
                     self[key][array] = new_val[key]
         else:
             for key in self.keys():
-                if self.is_array(self._contents[key]):
+                if self.is_array(self.contents[key]):
                     self._set_array_values(key, array, new_val) 
                 else:
                     self[key][array] = new_val
 
     def _set_array_values(self, key, mask, new_value):
-        self._contents[key][mask] = new_value
+        self.contents[key][mask] = new_value
 
     def _set_with_arraytainer(self, arraytainer, new_val):
         for key, mask in arraytainer.items():
-            self_val = self._contents[key]
+            self_val = self.contents[key]
             if isinstance(self_val, Arraytainer) and isinstance(new_val, Arraytainer):
-                self._contents[key][mask] = new_val._contents[key]
+                self.contents[key][mask] = new_val.contents[key]
             elif isinstance(self_val, Arraytainer) and self.is_array(new_val):
-                self._contents[key][mask] = new_val
+                self.contents[key][mask] = new_val
             elif self.is_array(self_val) and self.is_array(new_val):
                 self._set_array_values(key, mask, new_val)
             elif self.is_array(self_val) and isinstance(new_val, Arraytainer):                
@@ -348,7 +356,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     def _set_with_regular_key(self, key, new_val):
         try:
-            self._contents[key] = new_val
+            self.contents[key] = new_val
         except IndexError as e:
             if self.contents_type is list:
                 raise KeyError("""Unable to new assign items to a list-like Arraytainer;
@@ -358,9 +366,9 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     def _convert_to_array_or_arraytainer(self, val):
         if not (self.is_array(val) or isinstance(val, Arraytainer)):
             if isinstance(val, (list, dict)):
-                val = self.__class__(val, dtype=self._dtype)
+                val = self.__class__(val, dtype=self.dtype)
             else:
-                val = self.create_array(val, dtype=self._dtype)
+                val = self.create_array(val, dtype=self.dtype)
         return val
 
 
@@ -451,7 +459,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
             if isinstance(val, Arraytainer):
                 continue
             elif isinstance(val, (list, dict)):
-                contents[key] = self.__class__(val, array_conversions, dtype)
+                contents[key] = self.__class__(val, dtype=dtype, array_conversions=array_conversions)
             elif array_conversions:
                 contents[key] = self.create_array(val, dtype)
         return contents

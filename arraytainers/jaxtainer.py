@@ -11,8 +11,8 @@ _JNP_SUBMODULES = (jnp, *[module for _, module in getmembers(jnp, ismodule)])
 @register_pytree_node_class
 class Jaxtainer(Arraytainer):
 
-    def __init__(self, contents, array_conversions=True, dtype=None):
-        super().__init__(contents, array_conversions=array_conversions, dtype=dtype)
+    def __init__(self, contents, deepcopy=True, array_conversions=True, dtype=None):
+        super().__init__(contents, deepcopy=deepcopy, array_conversions=array_conversions, dtype=dtype)
 
     #
     #   Overridden Methods
@@ -34,12 +34,17 @@ class Jaxtainer(Arraytainer):
                 contents_copy[key] = copy.deepcopy(val)
         return contents_copy
 
-    def __deepcopy__(self, memo):
-        deepcopied_contents = self._deepcopy_contents(self._contents)
-        return self.__class__(deepcopied_contents)
-
     def _set_array_values(self, key, mask, value):
-        self._contents[key] = self._contents[key].at[mask].set(value)
+        self.contents[key] = self.contents[key].at[mask].set(value)
+
+    def flatten(self, order='C'):
+        output = np.squeeze(np.ravel(self, order=order))
+        elem_list = output.list_arrays()
+        for idx, elem in enumerate(elem_list):
+            if elem.ndim == 0:
+                elem_list[idx] = elem[None]
+        output = jnp.concatenate(elem_list)
+        return output
 
     @staticmethod
     def create_array(val, dtype=None):

@@ -67,12 +67,123 @@ def test_jaxtainer_size(contents, expected):
     assert result == expected
     assert type(result) == type(expected)
 
+flatten_tests = [
+    # Simple dict:
+    {'contents': {'a': np.array([[1,2,3],[4,5,6],[7,8,9]]), 'b': np.array([[6,5,4],[3,2,1]])},
+     'order': None,
+     'expected': np.array([1,2,3,4,5,6,7,8,9,6,5,4,3,2,1])},
+    {'contents': {'a': np.array([[1,2,3],[4,5,6],[7,8,9]]), 'b': np.array([[6,5,4],[3,2,1]])},
+     'order': 'C',
+     'expected': np.array([1,2,3,4,5,6,7,8,9,6,5,4,3,2,1])},
+    {'contents': {'a': np.array([[1,2,3],[4,5,6],[7,8,9]]), 'b': np.array([[6,5,4],[3,2,1]])},
+     'order': 'F',
+     'expected': np.array([1, 4, 7, 2, 5, 8, 3, 6, 9, 6, 3, 5, 2, 4, 1])},
+    # Simple List:
+    {'contents': [np.array([[1,2,3],[4,5,6],[7,8,9]]), np.array([[6,5,4],[3,2,1]])],
+     'order': None,
+     'expected': np.array([1,2,3,4,5,6,7,8,9,6,5,4,3,2,1])},
+    {'contents': [np.array([[1,2,3],[4,5,6],[7,8,9]]), np.array([[6,5,4],[3,2,1]])],
+     'order': 'C',
+     'expected': np.array([1,2,3,4,5,6,7,8,9,6,5,4,3,2,1])},
+    {'contents': [np.array([[1,2,3],[4,5,6],[7,8,9]]), np.array([[6,5,4],[3,2,1]])],
+     'order': 'F',
+     'expected': np.array([1, 4, 7, 2, 5, 8, 3, 6, 9, 6, 3, 5, 2, 4, 1])},
+    # Nested arraytainers:
+    {'contents': {'a': {'c': [np.array([[[1, 2],[3, 4]],[[5, 6],[7, 8]]]), np.array([[9,10]])]}, 1: [{'a': np.array([[11,12],[13,14]])}, np.array(15)]},
+     'order': None,
+     'expected': np.array([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15])},
+    {'contents': {'a': {'c': [np.array([[[1, 2],[3, 4]],[[5, 6],[7, 8]]]), np.array([[9,10]])]}, 1: [{'a': np.array([[11,12],[13,14]])}, np.array(15)]},
+     'order': 'C',
+     'expected': np.array([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15])},
+    {'contents': {'a': {'c': [np.array([[[1, 2],[3, 4]],[[5, 6],[7, 8]]]), np.array([[9,10]])]}, 1: [{'a': np.array([[11,12],[13,14]])}, np.array(15)]},
+     'order': 'F',
+     'expected': np.array([1, 5, 3, 7, 2, 6, 4, 8, 9, 10, 11, 13, 12, 14, 15])},
+]
+@pytest.mark.parametrize("contents, order, expected", [(test['contents'], test['order'], test['expected']) for test in flatten_tests])
+def test_arraytainer_flatten_method(contents, order, expected):
+    contents = helpers.deepcopy_contents(contents)
 
-# def test_flatten_method(contents, order, expected):
-#     pass
+    arraytainer = Arraytainer(contents)
+    if order is None:
+        result = arraytainer.flatten()
+    else:
+        result = arraytainer.flatten(order=order)
+    
+    helpers.assert_equal(result, expected)
 
-# def test_copy_method():
-#     pass
+@pytest.mark.parametrize("contents, order, expected", [(test['contents'], test['order'], test['expected']) for test in flatten_tests])
+def test_jaxtainer_flatten_method(contents, order, expected):
+    contents = helpers.deepcopy_contents(contents, has_jax_arrays=True)
 
-# def test_deepcopy_method():
-#     pass
+    jaxtainer = Jaxtainer(contents)
+    if order is None:
+        result = jaxtainer.flatten()
+    else:
+        result = jaxtainer.flatten(order=order)
+    
+    jax_expected = jnp.array(expected)
+    helpers.assert_equal(result, jax_expected)
+
+def test_arraytainer_shallow_copy():
+    original_val = np.array(1)
+    new_val =  np.array(2)
+    contents = {'a': [original_val], 'b': original_val}
+
+    arraytainer = Arraytainer(contents)
+    arraytainer_copy = arraytainer.copy()
+    arraytainer_copy['a'][0] = new_val
+    arraytainer_copy['b'] = new_val
+    arraytainer_copy['c'] = new_val
+
+    assert np.array_equal(arraytainer['a'][0], new_val)
+    assert np.array_equal(arraytainer['b'], original_val)
+    assert 'c' not in arraytainer.keys()
+
+def test_jaxtainer_shallow_copy():
+    original_val = jnp.array(1)
+    new_val =  jnp.array(2)
+    contents = {'a': [original_val], 'b': original_val}
+
+    jaxtainer = Jaxtainer(contents)
+    jaxtainer_copy = jaxtainer.copy()
+    jaxtainer_copy['a'][0] = new_val
+    jaxtainer_copy['b'] = new_val
+    jaxtainer_copy['c'] = new_val
+
+    assert np.array_equal(jaxtainer['a'][0], new_val)
+    assert isinstance(jaxtainer['a'][0], jnp.ndarray)
+    assert np.array_equal(jaxtainer['b'], original_val)
+    assert isinstance(jaxtainer['b'], jnp.ndarray)
+    assert 'c' not in jaxtainer.keys()
+
+def test_arraytainer_deep_copy():
+    original_val = np.array(1)
+    new_val =  np.array(2)
+    contents = {'a': [original_val], 'b': original_val}
+
+    arraytainer = Arraytainer(contents)
+    arraytainer_copy = arraytainer.deepcopy()
+    arraytainer_copy['a'][0] = new_val
+    arraytainer_copy['b'] = new_val
+    arraytainer_copy['c'] = new_val
+
+    assert np.array_equal(arraytainer['a'][0], original_val)
+    assert np.array_equal(arraytainer['b'], original_val)
+    assert 'c' not in arraytainer.keys()
+
+def test_jaxtainer_deep_copy():
+    original_val = jnp.array(1)
+    new_val =  jnp.array(2)
+    contents = {'a': [original_val], 'b': original_val}
+
+    jaxtainer = Jaxtainer(contents)
+    jaxtainer_copy = jaxtainer.deepcopy()
+    jaxtainer_copy['a'][0] = new_val
+    jaxtainer_copy['b'] = new_val
+    jaxtainer_copy['c'] = new_val
+
+    assert isinstance(jaxtainer['a'][0], jnp.ndarray)
+    assert np.array_equal(jaxtainer['a'][0], original_val)
+    assert isinstance(jaxtainer['b'], jnp.ndarray)
+    assert np.array_equal(jaxtainer['b'], original_val)
+    assert 'c' not in jaxtainer.keys()
