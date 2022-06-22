@@ -21,14 +21,14 @@ class Jaxtainer(Arraytainer):
     @classmethod
     def _deepcopy_contents(cls, contents):
         contents_copy = copy.copy(contents)
-        items = contents.items() if isinstance(contents, dict) else enumerate(contents)
+        items = contents.items() if cls.is_dict(contents) else enumerate(contents)
         for key, val in items:
             # Jax arrays converted to Numpy arrays if copied (Jax arrays are immutable):
             if cls.is_array(val):
                 contents_copy[key] = val
             elif isinstance(val, Arraytainer):
                 contents_copy[key] = cls._deepcopy_contents(val.contents)
-            elif isinstance(val, (list, dict)):
+            elif cls.is_list(val) or cls.is_dict(val):
                 contents_copy[key] = cls._deepcopy_contents(val)
             else:
                 contents_copy[key] = copy.deepcopy(val)
@@ -76,7 +76,7 @@ class Jaxtainer(Arraytainer):
     def _prepare_func_args(self, args, key):
         prepped_args = super()._prepare_func_args(args, key)
         # Jax methods don't use 'out' keyword in kwargs:
-        if isinstance(prepped_args, dict):
+        if self.is_dict(prepped_args):
             prepped_args.pop('out', None)
         return prepped_args
 

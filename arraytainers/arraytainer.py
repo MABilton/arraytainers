@@ -3,15 +3,16 @@ import copy
 from more_itertools import always_iterable
 import numbers
 import numpy as np
+from collections.abc import Iterable, Sequence, MutableMapping, MutableSequence
 
 class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     def __init__(self, contents, array_conversions=True, dtype=None, deepcopy=True):
         if not isinstance(contents, (list, dict)):
-            raise ValueError(f'contents must be either a list or a dict, not a {type(contents)}.')
+            raise ValueError(f'contents must be either list-like or dict-like, not {type(contents)}.')
         if deepcopy:
             contents = self._deepcopy_contents(contents)
-        if isinstance(contents, dict) and self._keys_contain_tuple(contents):
+        if self.is_dict(contents) and self._keys_contain_tuple(contents):
             raise KeyError("contents.keys() contains a tuple, which isn't allowed in an Arraytainer.")
         contents = self._recursive_arraytainer_conversion(contents, dtype, array_conversions)
         self._contents = contents
@@ -62,9 +63,9 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return contents, vector_idx
 
     @classmethod
-    def by_concatenation(cls, values, dtype=None):
-        if not isinstance(values, (list, tuple)):
-            values = [values]
+    def by_concatenation(cls, *values, dtype=None):
+        if len(values)==1 and isinstance(values[0], Iterable) and not (cls.is_array(values[0]) or isinstance(values, Arraytainer)):
+            values = values[0]
         val_is_arraytainer = [isinstance(val, Arraytainer) for val in values]
         if not any(val_is_arraytainer):
             raise ValueError('Must contain at least one arraytainer.')
@@ -147,28 +148,28 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return ((key, self.contents[key]) for key in self.keys())
 
     def append(self, new_val, *key_iterable):
-        if self.contents_type is not list:
-            raise AttributeError("""Can't append to dictionary-like Arraytainer; 
-            use update method instead.""") 
         new_val = self._convert_to_array_or_arraytainer(new_val)
-        key_iterable = list(key_iterable)
-        key = key_iterable.pop(0)
         if key_iterable:
-            self[key].append(new_val, *key_iterable)
+            key_iterable = list(key_iterable)
+            key = key_iterable.pop(0)
+            self.contents[key].append(new_val, *key_iterable)
         else:
+            if self.contents_type is not list:
+                raise TypeError("Can't append to dictionary-like Arraytainer; use update method instead.") 
             self.contents.append(new_val)
                 
     def update(self, new_val, *key_iterable):
-        if self.contents_type is not dict:
-            raise TypeError('''Can't update a list-like Arraytainer; 
-            use the append method instead.''')
         new_val = self._convert_to_array_or_arraytainer(new_val)
-        key_iterable = list(key_iterable)
-        key = key_iterable.pop(0)
         if key_iterable:
+            if len(key_iterable)==1 and hasattr(key_iterable[0], '__getitem__'):
+                key_iterable = key_iterable[0]
+            key_iterable = list(key_iterable)
+            key = key_iterable.pop(0)
             self[key].update(new_val, *key_iterable)
         else:
-            self[key].contents.update(new_val)
+            if self.contents_type is not dict:
+                raise TypeError("Can't update a list-like Arraytainer; use the append method instead.")
+            self.contents.update(new_val)
 
     def _get_with_arraytainer(self, arraytainer_key):
         item = {}
@@ -202,7 +203,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     @property
     def contents_type(self):
-        return type(self.contents)
+        return dict if self.is_dict(self.contents) else list
 
     @property
     def sizes(self):
@@ -365,12 +366,19 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     def _convert_to_array_or_arraytainer(self, val):
         if not (self.is_array(val) or isinstance(val, Arraytainer)):
-            if isinstance(val, (list, dict)):
+            if self.is_list(val) or self.is_dict(val):
                 val = self.__class__(val, dtype=self.dtype)
             else:
                 val = self.create_array(val, dtype=self.dtype)
         return val
 
+    @staticmethod
+    def is_dict(val):
+        return isinstance(val, MutableMapping)
+
+    @staticmethod
+    def is_list(val):
+        return isinstance(val, MutableSequence)
 
     def _manage_func_call(self, func, types, *args, **kwargs):
         arraytainer_list = self._list_arraytainers_in_args(args) + self._list_arraytainers_in_args(kwargs)
@@ -385,13 +393,13 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return self.__class__(func_return)
 
     def _list_arraytainers_in_args(self, args):
-        args_iter = args.values() if isinstance(args, dict) else args
+        args_iter = args.values() if self.is_dict(args) else args
         args_arraytainers = []
         for arg_i in args_iter:
             if isinstance(arg_i, Arraytainer):
                 args_arraytainers.append(arg_i)
             # Could have an arraytainer in a list in a tuple (e.g. np.concatenate):
-            elif isinstance(arg_i, (list, tuple, dict)):
+            elif self.is_list(arg_i) or self.is_dict(arg_i) or isinstance(arg_i, tuple):
                 args_arraytainers += self._list_arraytainers_in_args(arg_i)
         return args_arraytainers
 
@@ -411,7 +419,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return set.intersection(*[set(arraytainer.keys()) for arraytainer in arraytainer_list])
 
     def _prepare_func_args(self, args, key):
-        args_iter = args.items() if isinstance(args, dict) else enumerate(args)
+        args_iter = args.items() if self.is_dict(args) else enumerate(args)
         prepped_args = {}
         for arg_key, arg in args_iter:
             if isinstance(arg, Arraytainer):
@@ -419,16 +427,16 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
                 if key in arg.keys():
                     prepped_args[arg_key] = arg[key]
             # Tuple args may contain arraytainer entries:
-            elif isinstance(arg, (tuple, list, dict)):
+            elif isinstance(arg, tuple) or self.is_dict(arg) or self.is_list(arg):
                 prepped_arg = self._prepare_func_args(arg, key)
                 # Remove redundant tuple wrapping (i.e. single tuple wrapped in tuple);
                 # required for arraytainer.reshape((new_shape_arraytainer,))
-                if isinstance(prepped_arg, (tuple,list)) and len(prepped_arg)==1:
+                if isinstance(prepped_arg, Iterable) and len(prepped_arg)==1:
                     prepped_arg = prepped_arg[0]
                 prepped_args[arg_key] = prepped_arg
             else:
                 prepped_args[arg_key] = arg
-        if not isinstance(args, dict):
+        if not self.is_dict(args):
             prepped_args = tuple(prepped_args.values())
         return prepped_args
 
@@ -454,11 +462,11 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return np.array(val, dtype=dtype)
 
     def _recursive_arraytainer_conversion(self, contents, dtype, array_conversions=True):
-        items = contents.items() if isinstance(contents, dict) else enumerate(contents)
+        items = contents.items() if self.is_dict(contents) else enumerate(contents)
         for key, val in items:
             if isinstance(val, Arraytainer):
                 continue
-            elif isinstance(val, (list, dict)):
+            elif self.is_list(val) or self.is_dict(val):
                 contents[key] = self.__class__(val, dtype=dtype, array_conversions=array_conversions)
             elif array_conversions:
                 contents[key] = self.create_array(val, dtype)
@@ -472,11 +480,3 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     def transpose(self):
         return np.transpose(self)
-
-    def resize(self, new_shapes):
-        if not isinstance(new_shapes, (tuple, list)):
-            new_shapes = (new_shapes,)
-        is_arraytainer = [isinstance(shape, Arraytainer) for shape in new_shapes]
-        if any(is_arraytainer) and not all(is_arraytainer):
-            new_shapes = self.__class__.by_concatenation(new_shapes)
-        return np.resize(self, new_shapes)

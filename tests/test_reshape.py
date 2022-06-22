@@ -249,9 +249,7 @@ def test_arraytainer_reshape_with_tuple_shape_and_arraytainer_order(contents, sh
     order = helpers.deepcopy_contents(order)
 
     arraytainer = Arraytainer(contents)
-    print(order)
     order = Arraytainer(order, array_conversions=False)
-    print(order)
     result_1 = arraytainer.reshape(shape, order=order)
     result_2 = arraytainer.reshape(*shape, order=order)
 

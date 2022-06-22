@@ -4,9 +4,18 @@ import jax.numpy
 from arraytainers import Jaxtainer
 
 
-def jax_test_func(arg1, arg2):
+def computations(array):
+    y = np.sin(x**2 + 1)
+    y = y.reshape(1,-1)
+    y = y.squeeze()
+    z = y.size
+    y.sum()
+    
+
+def jax_test_func(array):
     x = Jaxtainer()
-    return x**2 + 1
+    
+    return 
 
 def test_vmap():
     pass

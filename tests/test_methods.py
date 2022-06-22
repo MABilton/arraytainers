@@ -1,128 +1,9 @@
-
 import pytest
 from arraytainers import Arraytainer, Jaxtainer
 import numpy as np
 import jax.numpy as jnp
 
 import helpers
-
-transpose_tests = [
-    {'contents': {'a': np.array([[1,2],[3,4]]), 'b': np.array([[5,6],[7,8]])}, 
-     'expected': {'a': np.array([[1,2],[3,4]]).T, 'b': np.array([[5,6],[7,8]]).T} },
-    {'contents': [np.array([[1,2],[3,4]]), np.array([[5,6],[7,8]])], 
-     'expected': [np.array([[1,2],[3,4]]).T, np.array([[5,6],[7,8]]).T] },
-    {'contents': {'a': [np.array([[1,2],[3,4]]), np.array([[9],[10]])], 'b': {'c': [np.array([[5,6],[7,8]]), np.array([[[9,10]]])]}}, 
-     'expected': {'a': [np.array([[1,2],[3,4]]).T, np.array([[9],[10]]).T], 'b': {'c': [np.array([[5,6],[7,8]]).T, np.array([[[9,10]]]).T]}} }
-]
-@pytest.mark.parametrize("contents, expected", [(test['contents'], test['expected']) for test in transpose_tests])
-def test_arraytainer_transpose(contents, expected):
-    contents = helpers.deepcopy_contents(contents)
-    expected = helpers.deepcopy_contents(expected)
-    arraytainer = Arraytainer(contents)
-    
-    result_1 = arraytainer.T
-    result_2 = arraytainer.transpose()
-
-    helpers.assert_equal(result_1.unpack(), expected)
-    helpers.assert_equal(result_2.unpack(), expected)
-    helpers.assert_equal(result_1, Arraytainer(expected))
-    helpers.assert_equal(result_2, Arraytainer(expected))
-
-@pytest.mark.parametrize("contents, expected", [(test['contents'], test['expected']) for test in transpose_tests])
-def test_jaxtainer_transpose(contents, expected):
-    contents = helpers.deepcopy_contents(contents, has_jax_arrays=True)
-    expected = helpers.deepcopy_contents(expected, has_jax_arrays=True)
-    arraytainer = Jaxtainer(contents)
-    
-    result_1 = arraytainer.T
-    result_2 = arraytainer.transpose()
-
-    helpers.assert_equal(result_1.unpack(), expected)
-    helpers.assert_equal(result_2.unpack(), expected)
-    helpers.assert_equal(result_1, Jaxtainer(expected))
-    helpers.assert_equal(result_2, Jaxtainer(expected))
-
-size_tests = [
-    {'contents': {'a': np.ones((2,2)), 'b': np.ones((3,3,3)), 'c': 2}, 'expected': 2**2 + 3**3 + 1 },
-    {'contents': [np.ones((2,2)), np.ones((3,3,3)), 2], 'expected': 2**2 + 3**3 + 1 },
-    {'contents': {'a': [np.ones((3,3,3)), np.ones((2,2))], 'b': {'c': [np.ones((2,2,2)), 1]}}, 'expected': 3**3 + 2**2 + 2**3 + 1}
-]
-@pytest.mark.parametrize("contents, expected", [(test['contents'], test['expected']) for test in size_tests])
-def test_arraytainer_size(contents, expected):
-    contents = helpers.deepcopy_contents(contents)
-    arraytainer = Arraytainer(contents)
-
-    result = arraytainer.size
-
-    assert result == expected
-    assert type(result) == type(expected)
-
-@pytest.mark.parametrize("contents, expected", [(test['contents'], test['expected']) for test in size_tests])
-def test_jaxtainer_size(contents, expected):
-    contents = helpers.deepcopy_contents(contents, has_jax_arrays=True)
-    jaxtainer = Jaxtainer(contents)
-
-    result = jaxtainer.size
-
-    assert result == expected
-    assert type(result) == type(expected)
-
-flatten_tests = [
-    # Simple dict:
-    {'contents': {'a': np.array([[1,2,3],[4,5,6],[7,8,9]]), 'b': np.array([[6,5,4],[3,2,1]])},
-     'order': None,
-     'expected': np.array([1,2,3,4,5,6,7,8,9,6,5,4,3,2,1])},
-    {'contents': {'a': np.array([[1,2,3],[4,5,6],[7,8,9]]), 'b': np.array([[6,5,4],[3,2,1]])},
-     'order': 'C',
-     'expected': np.array([1,2,3,4,5,6,7,8,9,6,5,4,3,2,1])},
-    {'contents': {'a': np.array([[1,2,3],[4,5,6],[7,8,9]]), 'b': np.array([[6,5,4],[3,2,1]])},
-     'order': 'F',
-     'expected': np.array([1, 4, 7, 2, 5, 8, 3, 6, 9, 6, 3, 5, 2, 4, 1])},
-    # Simple List:
-    {'contents': [np.array([[1,2,3],[4,5,6],[7,8,9]]), np.array([[6,5,4],[3,2,1]])],
-     'order': None,
-     'expected': np.array([1,2,3,4,5,6,7,8,9,6,5,4,3,2,1])},
-    {'contents': [np.array([[1,2,3],[4,5,6],[7,8,9]]), np.array([[6,5,4],[3,2,1]])],
-     'order': 'C',
-     'expected': np.array([1,2,3,4,5,6,7,8,9,6,5,4,3,2,1])},
-    {'contents': [np.array([[1,2,3],[4,5,6],[7,8,9]]), np.array([[6,5,4],[3,2,1]])],
-     'order': 'F',
-     'expected': np.array([1, 4, 7, 2, 5, 8, 3, 6, 9, 6, 3, 5, 2, 4, 1])},
-    # Nested arraytainers:
-    {'contents': {'a': {'c': [np.array([[[1, 2],[3, 4]],[[5, 6],[7, 8]]]), np.array([[9,10]])]}, 1: [{'a': np.array([[11,12],[13,14]])}, np.array(15)]},
-     'order': None,
-     'expected': np.array([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15])},
-    {'contents': {'a': {'c': [np.array([[[1, 2],[3, 4]],[[5, 6],[7, 8]]]), np.array([[9,10]])]}, 1: [{'a': np.array([[11,12],[13,14]])}, np.array(15)]},
-     'order': 'C',
-     'expected': np.array([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15])},
-    {'contents': {'a': {'c': [np.array([[[1, 2],[3, 4]],[[5, 6],[7, 8]]]), np.array([[9,10]])]}, 1: [{'a': np.array([[11,12],[13,14]])}, np.array(15)]},
-     'order': 'F',
-     'expected': np.array([1, 5, 3, 7, 2, 6, 4, 8, 9, 10, 11, 13, 12, 14, 15])},
-]
-@pytest.mark.parametrize("contents, order, expected", [(test['contents'], test['order'], test['expected']) for test in flatten_tests])
-def test_arraytainer_flatten_method(contents, order, expected):
-    contents = helpers.deepcopy_contents(contents)
-
-    arraytainer = Arraytainer(contents)
-    if order is None:
-        result = arraytainer.flatten()
-    else:
-        result = arraytainer.flatten(order=order)
-    
-    helpers.assert_equal(result, expected)
-
-@pytest.mark.parametrize("contents, order, expected", [(test['contents'], test['order'], test['expected']) for test in flatten_tests])
-def test_jaxtainer_flatten_method(contents, order, expected):
-    contents = helpers.deepcopy_contents(contents, has_jax_arrays=True)
-
-    jaxtainer = Jaxtainer(contents)
-    if order is None:
-        result = jaxtainer.flatten()
-    else:
-        result = jaxtainer.flatten(order=order)
-    
-    jax_expected = jnp.array(expected)
-    helpers.assert_equal(result, jax_expected)
 
 def test_arraytainer_shallow_copy():
     original_val = np.array(1)
@@ -187,3 +68,114 @@ def test_jaxtainer_deep_copy():
     assert isinstance(jaxtainer['b'], jnp.ndarray)
     assert np.array_equal(jaxtainer['b'], original_val)
     assert 'c' not in jaxtainer.keys()
+
+update_dict_tests = [
+    {'contents': {'a':np.array(1), 'b':np.array(2)},
+     'key_iterable': None,
+     'new_val': {'c': np.array(3)},
+     'expected': {'a':np.array(1), 'b':np.array(2), 'c':np.array(3)}},
+    {'contents': {'a':np.array(1), 'b':np.array(2)},
+     'key_iterable': None,
+     'new_val': {'c': [{'d':np.array(3)}]},
+     'expected': {'a':np.array(1), 'b':np.array(2), 'c':[{'d':np.array(3)}]}},
+    {'contents': [{'a':np.array(1), 'b':np.array(2)}],
+     'key_iterable': (0,),
+     'new_val': {'c': np.array(3)},
+     'expected': [{'a':np.array(1), 'b':np.array(2), 'c':np.array(3)}]},
+    {'contents': {'a':[[{'d':np.array(1)}]], 'b':np.array(2)},
+     'key_iterable': ('a',0,0),
+     'new_val': {'c': np.array(3)},
+     'expected': {'a':[[{'d':np.array(1), 'c':np.array(3)}]], 'b':np.array(2)} },
+    {'contents': {'a':[[{'d':np.array(1)}]], 'b':np.array(2)},
+     'key_iterable': ('a',0,0),
+     'new_val': {'c': [{'d':np.array(3)}]},
+     'expected': {'a':[[{'d':np.array(1), 'c':[{'d':np.array(3)}]}]], 'b':np.array(2)} },
+]
+@pytest.mark.parametrize("contents, key_iterable, new_val, expected", [(test['contents'], test['key_iterable'], test['new_val'], test['expected']) for test in update_dict_tests])
+def test_arraytainer_update_with_nonarraytainer(contents, key_iterable, new_val, expected):
+    contents = helpers.deepcopy_contents(contents)
+    expected = helpers.deepcopy_contents(expected)
+    new_val = helpers.deepcopy_contents(new_val)
+    
+    arraytainer = Arraytainer(contents)
+    if key_iterable is None:
+        arraytainer.update(new_val)
+    else:
+        arraytainer.update(new_val, *key_iterable)
+
+    helpers.assert_equal(arraytainer.unpack(),expected)
+    helpers.assert_equal(arraytainer, Arraytainer(expected))
+
+@pytest.mark.parametrize("contents, key_iterable, new_val, expected", [(test['contents'], test['key_iterable'], test['new_val'], test['expected']) for test in update_dict_tests])
+def test_arraytainer_update_with_arraytainer(contents, key_iterable, new_val, expected):
+    contents = helpers.deepcopy_contents(contents)
+    expected = helpers.deepcopy_contents(expected)
+    new_val = helpers.deepcopy_contents(new_val)
+
+    arraytainer = Arraytainer(contents)
+    new_val_arraytainer = Arraytainer(new_val)
+    if key_iterable is None:
+        arraytainer.update(new_val_arraytainer)
+    else:
+        arraytainer.update(new_val_arraytainer, *key_iterable)
+
+    helpers.assert_equal(arraytainer.unpack(),expected)
+    helpers.assert_equal(arraytainer, Arraytainer(expected))
+
+def test_arraytainer_append():
+    pass
+
+append_dict_error_tests = [
+    {'contents': {'a': np.array(1)},
+    'key_iterable': None},
+    {'contents': [{'a': np.array(1)}],
+    'key_iterable': (0,)},
+    {'contents': {'b':[{'a': np.array(1)}]},
+    'key_iterable': ('b',0)},
+]
+@pytest.mark.parametrize("contents, key_iterable", [(test['contents'], test['key_iterable']) for test in append_dict_error_tests])
+def test_arraytainer_append_to_dict_error(contents, key_iterable):
+    new_val = np.array(1)
+    contents = helpers.deepcopy_contents(contents)
+    arraytainer = Arraytainer(contents)
+    if key_iterable is None:
+        key_iterable = []
+    with pytest.raises(TypeError, match="Can't append to dictionary-like Arraytainer"):
+        if key_iterable:
+            arraytainer.append(new_val, *key_iterable)
+        else:
+            arraytainer.append(new_val)
+
+
+update_list_error_tests = [
+    {'contents': [np.array(1)],
+    'key_iterable': None},
+    {'contents': {'a': [np.array(1)]},
+    'key_iterable': ('a',)},
+    {'contents': [{'a':[np.array(1)]}],
+    'key_iterable': (0,'a')},
+]
+@pytest.mark.parametrize("contents, key_iterable", [(test['contents'], test['key_iterable']) for test in update_list_error_tests])
+def test_arraytainer_update_list_error(contents, key_iterable):
+    new_val = {123: np.array(1)}
+    contents = helpers.deepcopy_contents(contents)
+    arraytainer = Arraytainer(contents)
+    if key_iterable is None:
+        key_iterable = []
+    with pytest.raises(TypeError, match="Can't update a list-like Arraytainer"):
+        if key_iterable:
+            arraytainer.update(new_val, *key_iterable)
+        else:
+            arraytainer.update(new_val)
+
+def test_jaxtainer_update():
+    pass
+
+def test_jaxtainer_append():
+    pass
+
+def test_jaxtainer_append_to_dict_error():
+    pass
+
+def test_jaxtainer_update_list_error():
+    pass
