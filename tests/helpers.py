@@ -2,12 +2,23 @@ from arraytainers import Arraytainer
 import numpy as np
 import jax.numpy as jnp
 import copy
+from numbers import Number
 
 def assert_equal(output, expected, approx_equal=False):
-    if isinstance(expected, (list, dict, Arraytainer)):
+    if isinstance(expected, (list, dict, tuple, Arraytainer)):
         assert_contents_equal(output, expected, approx_equal)
-    else:
+    elif isinstance(expected, (np.ndarray, jnp.ndarray)):
         assert_arrays_equal(output, expected, approx_equal)
+    else:
+        assert_numbers_equal(output, expected)
+
+def assert_numbers_equal(output, expected, approx_equal=False):
+    assert isinstance(output, Number)
+    assert isinstance(expected, Number)
+    if approx_equal:
+        assert np.allclose(output, expected)
+    else:
+        assert output == expected
 
 def assert_arrays_equal(output, expected, approx_equal=False):
     assert isinstance(output, (np.ndarray, jnp.ndarray))
@@ -21,10 +32,10 @@ def assert_arrays_equal(output, expected, approx_equal=False):
         assert np.array_equal(output, expected)
 
 def assert_contents_equal(output, expected, approx_equal=False):
-    assert isinstance(output, (Arraytainer, list, dict))
-    assert isinstance(expected, (Arraytainer, list, dict))
-    output_keys = range(len(output)) if isinstance(output, list) else output.keys()
-    expected_keys = range(len(expected)) if isinstance(expected, list) else expected.keys()
+    assert isinstance(output, (list, dict, tuple, Arraytainer))
+    assert isinstance(expected, (list, dict, tuple, Arraytainer))
+    output_keys = range(len(output)) if isinstance(output, (list, tuple)) else output.keys()
+    expected_keys = range(len(expected)) if isinstance(expected, (list, tuple)) else expected.keys()
     assert output_keys == expected_keys
     for key in expected_keys:
         assert_equal(output[key], expected[key], approx_equal)

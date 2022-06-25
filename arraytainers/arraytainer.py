@@ -152,6 +152,8 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         if key_iterable:
             key_iterable = list(key_iterable)
             key = key_iterable.pop(0)
+            if not isinstance(self[key], Arraytainer):
+                raise KeyError(f'Element specified by key_iterable is a {type(self[key])} object, not an Arraytainer.')
             self.contents[key].append(new_val, *key_iterable)
         else:
             if self.contents_type is not list:
@@ -165,7 +167,9 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
                 key_iterable = key_iterable[0]
             key_iterable = list(key_iterable)
             key = key_iterable.pop(0)
-            self[key].update(new_val, *key_iterable)
+            if not isinstance(self[key], Arraytainer):
+                raise KeyError(f'Element specified by key_iterable is a {type(self[key])} object, not an Arraytainer.')
+            self.contents[key].update(new_val, *key_iterable)
         else:
             if self.contents_type is not dict:
                 raise TypeError("Can't update a list-like Arraytainer; use the append method instead.")
@@ -286,7 +290,12 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     def tolist(self):
         output = {}
         for key, val in self.items():
-            if self.is_array(val) or isinstance(val, Arraytainer):
+            if self.is_array(val):
+                tolist_val = val.tolist()
+                if val.ndim > 0:
+                    tolist_val = tuple(tolist_val)
+                output[key] = tolist_val
+            elif isinstance(val, Arraytainer):
                 output[key] = val.tolist()
             else:
                 output[key] = val
