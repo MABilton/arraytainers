@@ -1,23 +1,30 @@
-from .arraytainer import Arraytainer
 import copy
-import numpy as np
+from inspect import getmembers, ismodule
+
 import jax
 import jax.numpy as jnp
+import numpy as np
 from jax.tree_util import register_pytree_node_class
-from inspect import getmembers, ismodule
+
+from .arraytainer import Arraytainer
 
 _JNP_SUBMODULES = (jnp, *[module for _, module in getmembers(jnp, ismodule)])
 
+
 @register_pytree_node_class
 class Jaxtainer(Arraytainer):
-
     def __init__(self, contents, deepcopy=True, array_conversions=True, dtype=None):
-        super().__init__(contents, deepcopy=deepcopy, array_conversions=array_conversions, dtype=dtype)
+        super().__init__(
+            contents,
+            deepcopy=deepcopy,
+            array_conversions=array_conversions,
+            dtype=dtype,
+        )
 
     #
     #   Overridden Methods
     #
-        
+
     @classmethod
     def _deepcopy_contents(cls, contents):
         contents_copy = copy.copy(contents)
@@ -37,7 +44,7 @@ class Jaxtainer(Arraytainer):
     def _set_array_values(self, key, mask, value):
         self.contents[key] = self.contents[key].at[mask].set(value)
 
-    def flatten(self, order='C'):
+    def flatten(self, order="C"):
         output = np.squeeze(np.ravel(self, order=order))
         elem_list = output.list_arrays()
         for idx, elem in enumerate(elem_list):
@@ -59,7 +66,9 @@ class Jaxtainer(Arraytainer):
     #
 
     def _manage_func_call(self, func, types, *args, **kwargs):
-        arraytainer_list = self._list_arraytainers_in_args(args) + self._list_arraytainers_in_args(kwargs)
+        arraytainer_list = self._list_arraytainers_in_args(
+            args
+        ) + self._list_arraytainers_in_args(kwargs)
         largest_arraytainer = max(arraytainer_list, key=len)
         self._check_arg_compatability(arraytainer_list, largest_arraytainer)
         shared_keyset = self._get_shared_keyset(arraytainer_list)
@@ -67,17 +76,19 @@ class Jaxtainer(Arraytainer):
         for key in shared_keyset:
             args_i = self._prepare_func_args(args, key)
             kwargs_i = self._prepare_func_args(kwargs, key)
-            arraytainer_list_i = self._list_arraytainers_in_args(args_i) + self._list_arraytainers_in_args(kwargs_i)
+            arraytainer_list_i = self._list_arraytainers_in_args(
+                args_i
+            ) + self._list_arraytainers_in_args(kwargs_i)
             # Need to call Numpy method for recursion on Arraytainer arguments:
             method = self._find_jnp_method(func) if not arraytainer_list_i else func
             func_return[key] = method(*args_i, **kwargs_i)
         return self.__class__(func_return)
-        
+
     def _prepare_func_args(self, args, key):
         prepped_args = super()._prepare_func_args(args, key)
         # Jax methods don't use 'out' keyword in kwargs:
         if self.is_dict(prepped_args):
-            prepped_args.pop('out', None)
+            prepped_args.pop("out", None)
         return prepped_args
 
     def _find_jnp_method(self, func):
@@ -86,8 +97,10 @@ class Jaxtainer(Arraytainer):
             if hasattr(submodule, method_name):
                 found_method = getattr(submodule, method_name)
                 break
-            elif i == len(_JNP_SUBMODULES)-1:
-                raise NotImplementedError(f'The {method_name} method is not implemented in jax.numpy.')
+            elif i == len(_JNP_SUBMODULES) - 1:
+                raise NotImplementedError(
+                    f"The {method_name} method is not implemented in jax.numpy."
+                )
         return found_method
 
     #
@@ -99,4 +112,6 @@ class Jaxtainer(Arraytainer):
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
-        return cls(jax.tree_util.tree_unflatten(aux_data, children), array_conversions=False)
+        return cls(
+            jax.tree_util.tree_unflatten(aux_data, children), array_conversions=False
+        )

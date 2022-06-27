@@ -1,20 +1,27 @@
-import warnings
 import copy
-from more_itertools import always_iterable
 import numbers
+import warnings
+from collections.abc import Iterable, MutableMapping, MutableSequence, Sequence
+
 import numpy as np
-from collections.abc import Iterable, Sequence, MutableMapping, MutableSequence
+from more_itertools import always_iterable
+
 
 class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
-
     def __init__(self, contents, array_conversions=True, dtype=None, deepcopy=True):
         if not (self.is_list(contents) or self.is_dict(contents)):
-            raise ValueError(f'contents must be either list-like or dict-like, not {type(contents)}.')
+            raise ValueError(
+                f"contents must be either list-like or dict-like, not {type(contents)}."
+            )
         if self.is_dict(contents) and self._keys_contain_tuple(contents):
-            raise KeyError("contents.keys() contains a tuple, which isn't allowed in an Arraytainer.")
+            raise KeyError(
+                "contents.keys() contains a tuple, which isn't allowed in an Arraytainer."
+            )
         if deepcopy:
             contents = self._deepcopy_contents(contents)
-        contents = self._recursive_arraytainer_conversion(contents, dtype, array_conversions)
+        contents = self._recursive_arraytainer_conversion(
+            contents, dtype, array_conversions
+        )
         self._contents = contents
         self._dtype = dtype
 
@@ -33,16 +40,20 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     #
 
     @classmethod
-    def from_array(cls, array, shapes, order='C'):
+    def from_array(cls, array, shapes, order="C"):
         if isinstance(shapes, Sequence):
             try:
                 shapes = cls._concatenate_values_into_arraytainer(shapes)
             except ValueError:
-                raise ValueError('shapes must contain at least one arraytainer, list, or dict.')
+                raise ValueError(
+                    "shapes must contain at least one arraytainer, list, or dict."
+                )
         # Ensure correct number of elements in array:
         output_size = shapes.sum()
         if output_size != array.size:
-            ValueError(f"Array contains {array.size} elements, but shapes specifies {output_size} elements.")
+            ValueError(
+                f"Array contains {array.size} elements, but shapes specifies {output_size} elements."
+            )
         vector = array.flatten()
         contents, _ = cls._from_vector(vector, shapes, order)
         return cls(contents)
@@ -54,10 +65,12 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         contents = {}
         for key, shape in shapes.items():
             if isinstance(shape, Arraytainer):
-                contents[key], vector_idx = cls._from_vector(vector, shape, order, vector_idx)
+                contents[key], vector_idx = cls._from_vector(
+                    vector, shape, order, vector_idx
+                )
             else:
                 num_elem = shape.prod(dtype=int)
-                array_vals = vector[vector_idx:vector_idx+num_elem]
+                array_vals = vector[vector_idx : vector_idx + num_elem]
                 vector_idx = vector_idx + num_elem
                 contents[key] = array_vals.reshape(shape, order=order)
         if shapes.contents_type is list:
@@ -66,16 +79,16 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     @classmethod
     def _concatenate_values_into_arraytainer(cls, values):
-        if len(values)==1:
+        if len(values) == 1:
             output = values[0]
             if cls.is_list(output) or cls.is_dict(output):
                 output = cls(output)
             elif not isinstance(output, Arraytainer):
-                raise ValueError('Single entry in values is not an arraytainer.')
+                raise ValueError("Single entry in values is not an arraytainer.")
         else:
             val_is_arraytainer = [isinstance(val, Arraytainer) for val in values]
             if not any(val_is_arraytainer):
-                raise ValueError('values must contain at least one arraytainer.')
+                raise ValueError("values must contain at least one arraytainer.")
             to_concat = []
             for idx, val_i in enumerate(values):
                 if isinstance(val_i, Arraytainer):
@@ -162,39 +175,51 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
             key_iterable = list(key_iterable)
             key = key_iterable.pop(0)
             if not isinstance(self[key], Arraytainer):
-                raise KeyError(f'Element specified by key_iterable is a {type(self[key])} object, not an Arraytainer.')
+                raise KeyError(
+                    f"Element specified by key_iterable is a {type(self[key])} object, not an Arraytainer."
+                )
             self.contents[key].append(new_val, *key_iterable)
         else:
             if self.contents_type is not list:
-                raise TypeError("Can't append to dictionary-like Arraytainer; use update method instead.") 
+                raise TypeError(
+                    "Can't append to dictionary-like Arraytainer; use update method instead."
+                )
             self.contents.append(new_val)
-                
+
     def update(self, new_val, *key_iterable):
         new_val = self._convert_to_array_or_arraytainer(new_val)
         if key_iterable:
-            if len(key_iterable)==1 and hasattr(key_iterable[0], '__getitem__'):
+            if len(key_iterable) == 1 and hasattr(key_iterable[0], "__getitem__"):
                 key_iterable = key_iterable[0]
             key_iterable = list(key_iterable)
             key = key_iterable.pop(0)
             if not isinstance(self[key], Arraytainer):
-                raise KeyError(f'Element specified by key_iterable is a {type(self[key])} object, not an Arraytainer.')
+                raise KeyError(
+                    f"Element specified by key_iterable is a {type(self[key])} object, not an Arraytainer."
+                )
             self.contents[key].update(new_val, *key_iterable)
         else:
             if self.contents_type is not dict:
-                raise TypeError("Can't update a list-like Arraytainer; use the append method instead.")
+                raise TypeError(
+                    "Can't update a list-like Arraytainer; use the append method instead."
+                )
             self.contents.update(new_val)
 
     def _get_with_arraytainer(self, arraytainer_key):
         item = {}
         for key, val in arraytainer_key.items():
             if key not in self.keys():
-                raise KeyError("Arraytainer index contains keys not found in original Arraytainer.")
+                raise KeyError(
+                    "Arraytainer index contains keys not found in original Arraytainer."
+                )
             if self.is_array(self.contents[key]) and isinstance(val, Arraytainer):
-                raise KeyError("Arraytainer index contains keys not found in original Arraytainer.")
+                raise KeyError(
+                    "Arraytainer index contains keys not found in original Arraytainer."
+                )
             item[key] = self.contents[key][val]
         if self.contents_type is list:
             item = list(item.values())
-        return self.__class__(item)   
+        return self.__class__(item)
 
     def _get_with_array(self, array_key):
         item = {key: self.contents[key][array_key] for key in self.keys()}
@@ -207,7 +232,9 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
             item = self.contents[key]
         except (IndexError, KeyError, TypeError):
             key_strs = [str(key_i) for key_i in self.keys()]
-            raise KeyError(f"""{key} is not a key in this Arraytainer; valid keys are: {', '.join(key_strs)}.""")        
+            raise KeyError(
+                f"""{key} is not a key in this Arraytainer; valid keys are: {', '.join(key_strs)}."""
+            )
         return item
 
     @property
@@ -255,7 +282,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
             else:
                 array_list.append(val)
         return array_list
-    
+
     def all(self):
         for key in self.keys():
             if not self.contents[key].all():
@@ -278,14 +305,14 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         arraytainer_of_scalars = np.sum(self)
         return sum(arraytainer_of_scalars.list_arrays())
 
-    def reshape(self, *new_shapes, order='C'):
-        if len(new_shapes)==1 and isinstance(new_shapes[0], Sequence):
+    def reshape(self, *new_shapes, order="C"):
+        if len(new_shapes) == 1 and isinstance(new_shapes[0], Sequence):
             new_shapes = new_shapes[0]
         if any(isinstance(shape, Arraytainer) for shape in new_shapes):
-            new_shapes = self._concatenate_values_into_arraytainer(new_shapes)                
+            new_shapes = self._concatenate_values_into_arraytainer(new_shapes)
         return np.reshape(self, new_shapes, order=order)
 
-    def flatten(self, order='C'):
+    def flatten(self, order="C"):
         output = np.squeeze(np.ravel(self, order=order))
         elem_list = output.list_arrays()
         for idx, elem in enumerate(elem_list):
@@ -338,18 +365,24 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     def _set_with_array(self, array, new_val):
         if isinstance(new_val, Arraytainer):
             for key in new_val.keys():
-                if (key not in self.keys()):
-                    raise KeyError('New Arraytainer value to set contains keys not found in the original Arraytainer.')
-                if self.is_array(self.contents[key]) and (not self.is_array(new_val[key])):
-                    raise KeyError('New Arraytainer value to set contains keys not found in the original Arraytainer.')
+                if key not in self.keys():
+                    raise KeyError(
+                        "New Arraytainer value to set contains keys not found in the original Arraytainer."
+                    )
+                if self.is_array(self.contents[key]) and (
+                    not self.is_array(new_val[key])
+                ):
+                    raise KeyError(
+                        "New Arraytainer value to set contains keys not found in the original Arraytainer."
+                    )
                 elif self.is_array(self.contents[key]):
-                    self._set_array_values(key, array, new_val[key])      
+                    self._set_array_values(key, array, new_val[key])
                 else:
                     self[key][array] = new_val[key]
         else:
             for key in self.keys():
                 if self.is_array(self.contents[key]):
-                    self._set_array_values(key, array, new_val) 
+                    self._set_array_values(key, array, new_val)
                 else:
                     self[key][array] = new_val
 
@@ -365,19 +398,21 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
                 self.contents[key][mask] = new_val
             elif self.is_array(self_val) and self.is_array(new_val):
                 self._set_array_values(key, mask, new_val)
-            elif self.is_array(self_val) and isinstance(new_val, Arraytainer):                
+            elif self.is_array(self_val) and isinstance(new_val, Arraytainer):
                 if (key not in new_val.keys()) or (not self.is_array(new_val[key])):
-                    raise KeyError('New Arraytainer value to set contains keys not found in the original Arraytainer.')
-                self._set_array_values(key, mask, new_val[key]) 
-                
+                    raise KeyError(
+                        "New Arraytainer value to set contains keys not found in the original Arraytainer."
+                    )
+                self._set_array_values(key, mask, new_val[key])
 
     def _set_with_regular_key(self, key, new_val):
         try:
             self.contents[key] = new_val
         except IndexError as e:
             if self.contents_type is list:
-                raise KeyError("""Unable to new assign items to a list-like Arraytainer;
-                                use the append method instead.""")
+                raise KeyError(
+                    "Unable to new assign items to a list-like Arraytainer; use the append method instead."
+                )
             raise e
 
     def _convert_to_array_or_arraytainer(self, val):
@@ -397,7 +432,9 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return isinstance(val, MutableSequence)
 
     def _manage_func_call(self, func, types, *args, **kwargs):
-        arraytainer_list = self._list_arraytainers_in_args(args) + self._list_arraytainers_in_args(kwargs)
+        arraytainer_list = self._list_arraytainers_in_args(
+            args
+        ) + self._list_arraytainers_in_args(kwargs)
         largest_arraytainer = max(arraytainer_list, key=len)
         self._check_arg_compatability(arraytainer_list, largest_arraytainer)
         shared_keyset = self._get_shared_keyset(arraytainer_list)
@@ -423,16 +460,22 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         largest_keyset = set(largest_arraytainer.keys())
         for arraytainer in arraytainer_list:
             if arraytainer.contents_type != largest_arraytainer.contents_type:
-                raise KeyError("""Arraytainers being combined through operations 
-                must be all dictionary-like or all list-like""")
+                raise KeyError(
+                    """Arraytainers being combined through operations
+                must be all dictionary-like or all list-like"""
+                )
             keyset = set(arraytainer.keys())
             if not keyset.issubset(largest_keyset):
-                raise KeyError(f"""Keys of arraytainer argument (= {keyset}) are not 
-                a subset of the keys of the largest Arraytainer (={largest_keyset}) it's being combined with.""")
-    
+                raise KeyError(
+                    f"""Keys of arraytainer argument (= {keyset}) are not
+                a subset of the keys of the largest Arraytainer (={largest_keyset}) it's being combined with."""
+                )
+
     @staticmethod
     def _get_shared_keyset(arraytainer_list):
-        return set.intersection(*[set(arraytainer.keys()) for arraytainer in arraytainer_list])
+        return set.intersection(
+            *[set(arraytainer.keys()) for arraytainer in arraytainer_list]
+        )
 
     def _prepare_func_args(self, args, key):
         args_iter = args.items() if self.is_dict(args) else enumerate(args)
@@ -447,7 +490,7 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
                 prepped_arg = self._prepare_func_args(arg, key)
                 # Remove redundant tuple wrapping (i.e. single tuple wrapped in tuple);
                 # required for arraytainer.reshape((new_shape_arraytainer,))
-                if isinstance(prepped_arg, Iterable) and len(prepped_arg)==1:
+                if isinstance(prepped_arg, Iterable) and len(prepped_arg) == 1:
                     prepped_arg = prepped_arg[0]
                 prepped_args[arg_key] = prepped_arg
             else:
@@ -461,7 +504,9 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         if isinstance(val, slice):
             is_slice = True
         # Slices accross multiple dimensions appear as tuples of ints/slices/Nones (e.g. my_array[3, 1:2, :])
-        elif isinstance(val, tuple) and all(isinstance(val_i, (type(None), slice, int)) for val_i in val):
+        elif isinstance(val, tuple) and all(
+            isinstance(val_i, (type(None), slice, int)) for val_i in val
+        ):
             is_slice = True
         elif val is None:
             is_slice = True
@@ -477,13 +522,17 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
     def create_array(val, dtype=None):
         return np.array(val, dtype=dtype)
 
-    def _recursive_arraytainer_conversion(self, contents, dtype, array_conversions=True):
+    def _recursive_arraytainer_conversion(
+        self, contents, dtype, array_conversions=True
+    ):
         items = contents.items() if self.is_dict(contents) else enumerate(contents)
         for key, val in items:
             if isinstance(val, Arraytainer):
                 continue
             elif self.is_list(val) or self.is_dict(val):
-                contents[key] = self.__class__(val, dtype=dtype, array_conversions=array_conversions)
+                contents[key] = self.__class__(
+                    val, dtype=dtype, array_conversions=array_conversions
+                )
             elif array_conversions:
                 contents[key] = self.create_array(val, dtype)
         return contents

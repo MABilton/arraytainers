@@ -1,8 +1,11 @@
-from arraytainers import Arraytainer
-import numpy as np
-import jax.numpy as jnp
 import copy
 from numbers import Number
+
+import jax.numpy as jnp
+import numpy as np
+
+from arraytainers import Arraytainer
+
 
 def assert_equal(output, expected, approx_equal=False):
     if isinstance(expected, (list, dict, tuple, Arraytainer)):
@@ -12,6 +15,7 @@ def assert_equal(output, expected, approx_equal=False):
     else:
         assert_numbers_equal(output, expected)
 
+
 def assert_numbers_equal(output, expected, approx_equal=False):
     assert isinstance(output, Number)
     assert isinstance(expected, Number)
@@ -19,6 +23,7 @@ def assert_numbers_equal(output, expected, approx_equal=False):
         assert np.allclose(output, expected)
     else:
         assert output == expected
+
 
 def assert_arrays_equal(output, expected, approx_equal=False):
     assert isinstance(output, (np.ndarray, jnp.ndarray))
@@ -31,15 +36,21 @@ def assert_arrays_equal(output, expected, approx_equal=False):
     else:
         assert np.array_equal(output, expected)
 
+
 def assert_contents_equal(output, expected, approx_equal=False):
     assert isinstance(output, (list, dict, tuple, Arraytainer))
     assert isinstance(expected, (list, dict, tuple, Arraytainer))
     assert type(output) == type(expected)
-    output_keys = range(len(output)) if isinstance(output, (list, tuple)) else output.keys()
-    expected_keys = range(len(expected)) if isinstance(expected, (list, tuple)) else expected.keys()
+    output_keys = (
+        range(len(output)) if isinstance(output, (list, tuple)) else output.keys()
+    )
+    expected_keys = (
+        range(len(expected)) if isinstance(expected, (list, tuple)) else expected.keys()
+    )
     assert output_keys == expected_keys
     for key in expected_keys:
         assert_equal(output[key], expected[key], approx_equal)
+
 
 def deepcopy_contents(contents, dtype=None, has_jax_arrays=False):
     contents = copy.deepcopy(contents)
@@ -49,7 +60,8 @@ def deepcopy_contents(contents, dtype=None, has_jax_arrays=False):
         contents = convert_arrays_to_numpy(contents, dtype)
     return contents
 
-def convert_arrays_to_jax(contents, dtype=None): 
+
+def convert_arrays_to_jax(contents, dtype=None):
     if isinstance(contents, (np.ndarray, jnp.ndarray)):
         contents = jnp.array(contents, dtype=dtype)
     elif isinstance(contents, (dict, list, Arraytainer)):
@@ -61,7 +73,8 @@ def convert_arrays_to_jax(contents, dtype=None):
                 contents[key] = convert_arrays_to_jax(val, dtype)
     return contents
 
-def convert_arrays_to_numpy(contents, dtype=None): 
+
+def convert_arrays_to_numpy(contents, dtype=None):
     if isinstance(contents, (np.ndarray, jnp.ndarray)):
         contents = np.array(contents, dtype=dtype)
     elif isinstance(contents, (dict, list, Arraytainer)):
