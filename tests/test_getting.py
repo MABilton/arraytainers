@@ -11,18 +11,18 @@ dict_tests = [
  { 'key': 'a', 'expected': np.array([[1,2],[3,4]]) },
  { 'key': 'b', 'expected': np.array([[5,6],[7,8]]) },
  # Tuple keys:
- { 'key': (1,), 'expected': {'a': np.array([3,4]), 'b': np.array([7,8])} },
- { 'key': (0,1), 'expected': {'a': np.array(2), 'b': np.array(6) } },
+ { 'key': (1,), 'expected': Arraytainer({'a': np.array([3,4]), 'b': np.array([7,8])}) },
+ { 'key': (0,1), 'expected': Arraytainer({'a': np.array(2), 'b': np.array(6)}) },
  # Slice key:
- { 'key': slice(0,1), 'expected': {'a': np.array([[1,2]]), 'b': np.array([[5,6]])} },
- { 'key': (slice(0,1), slice(0,1)), 'expected': {'a': np.array([[1]]), 'b': np.array([[5]])} },
- { 'key': (None, slice(None,None)), 'expected': {'a': np.array([[[1,2],[3,4]]]), 'b': np.array([[[5,6],[7,8]]])} },
+ { 'key': slice(0,1), 'expected': Arraytainer({'a': np.array([[1,2]]), 'b': np.array([[5,6]])}) },
+ { 'key': (slice(0,1), slice(0,1)), 'expected': Arraytainer({'a': np.array([[1]]), 'b': np.array([[5]])}) },
+ { 'key': (None, slice(None,None)), 'expected': Arraytainer({'a': np.array([[[1,2],[3,4]]]), 'b': np.array([[[5,6],[7,8]]])}) },
  # Slice and tuple:
- { 'key': (slice(0,None), 1), 'expected': {'a': np.array([2,4]), 'b': np.array([6,8])} },
- { 'key': (1, slice(None,1)), 'expected': {'a': np.array([3]), 'b': np.array([7])} },
+ { 'key': (slice(0,None), 1), 'expected': Arraytainer({'a': np.array([2,4]), 'b': np.array([6,8])}) },
+ { 'key': (1, slice(None,1)), 'expected': Arraytainer({'a': np.array([3]), 'b': np.array([7])}) },
  # Array keys:
- { 'key': np.array([True, False]), 'expected': {'a': np.array([[1,2]]), 'b': np.array([[5,6]])} },
- { 'key': np.array([[True, False], [False, True]]), 'expected': {'a': np.array([1,4]), 'b': np.array([5,8])} },
+ { 'key': np.array([True, False]), 'expected': Arraytainer({'a': np.array([[1,2]]), 'b': np.array([[5,6]])}) },
+ { 'key': np.array([[True, False], [False, True]]), 'expected': Arraytainer({'a': np.array([1,4]), 'b': np.array([5,8])}) },
  # Arraytainer keys:
  { 'key': Arraytainer({'a': np.array([True, False])}), 
    'expected': Arraytainer({'a': np.array([[1,2]])}) },
@@ -47,18 +47,18 @@ jax_dict_tests = [
  { 'key': 'a', 'expected': jnp.array([[1,2],[3,4]]) },
  { 'key': 'b', 'expected': jnp.array([[5,6],[7,8]]) },
  # Tuple keys:
- { 'key': (1,), 'expected': {'a': jnp.array([3,4]), 'b': jnp.array([7,8])} },
- { 'key': (0,1), 'expected': {'a': jnp.array(2), 'b': jnp.array(6) } },
+ { 'key': (1,), 'expected': Jaxtainer({'a': jnp.array([3,4]), 'b': jnp.array([7,8])}) },
+ { 'key': (0,1), 'expected': Jaxtainer({'a': jnp.array(2), 'b': jnp.array(6)}) },
  # Slice key:
- { 'key': slice(0,1), 'expected': {'a': jnp.array([[1,2]]), 'b': jnp.array([[5,6]])} },
- { 'key': (slice(0,1), slice(0,1)), 'expected': {'a': jnp.array([[1]]), 'b': jnp.array([[5]])} },
- { 'key': (None, slice(None,None)), 'expected': {'a': jnp.array([[[1,2],[3,4]]]), 'b': jnp.array([[[5,6],[7,8]]])} },
+ { 'key': slice(0,1), 'expected': Jaxtainer({'a': jnp.array([[1,2]]), 'b': jnp.array([[5,6]])}) },
+ { 'key': (slice(0,1), slice(0,1)), 'expected': Jaxtainer({'a': jnp.array([[1]]), 'b': jnp.array([[5]])}) },
+ { 'key': (None, slice(None,None)), 'expected': Jaxtainer({'a': jnp.array([[[1,2],[3,4]]]), 'b': jnp.array([[[5,6],[7,8]]])}) },
  # Slice and tuple:
- { 'key': (slice(0,None), 1), 'expected': {'a': jnp.array([2,4]), 'b': jnp.array([6,8])} },
- { 'key': (1, slice(None,1)), 'expected': {'a': jnp.array([3]), 'b': jnp.array([7])} },
+ { 'key': (slice(0,None), 1), 'expected': Jaxtainer({'a': jnp.array([2,4]), 'b': jnp.array([6,8])} )},
+ { 'key': (1, slice(None,1)), 'expected': Jaxtainer({'a': jnp.array([3]), 'b': jnp.array([7])}) },
  # Array keys:
- { 'key': jnp.array([True, False]), 'expected': {'a': jnp.array([[1,2]]), 'b': jnp.array([[5,6]])} },
- { 'key': jnp.array([[True, False], [False, True]]), 'expected': {'a': jnp.array([1,4]), 'b': jnp.array([5,8])} },
+ { 'key': jnp.array([True, False]), 'expected': Jaxtainer({'a': jnp.array([[1,2]]), 'b': jnp.array([[5,6]])}) },
+ { 'key': jnp.array([[True, False], [False, True]]), 'expected': Jaxtainer({'a': jnp.array([1,4]), 'b': jnp.array([5,8])}) },
  # Jaxtainer keys:
  { 'key': Jaxtainer({'a': jnp.array([True, False])}), 
    'expected': Jaxtainer({'a': jnp.array([[1,2]])}) },
@@ -83,18 +83,18 @@ list_tests = [
  { 'key': 0, 'expected': np.array([[1,2],[3,4]]) },
  { 'key': 1, 'expected': np.array([[5,6],[7,8]]) },
  # Tuple keys:
- { 'key': (1,), 'expected': [np.array([3,4]), np.array([7,8])] },
- { 'key': (0,1), 'expected': [np.array(2), np.array(6)] },
+ { 'key': (1,), 'expected': Arraytainer([np.array([3,4]), np.array([7,8])]) },
+ { 'key': (0,1), 'expected': Arraytainer([np.array(2), np.array(6)]) },
  # Slice key:
- { 'key': slice(0,1), 'expected': [np.array([[1,2]]), np.array([[5,6]])] },
- { 'key': (slice(0,1), slice(0,1)), 'expected': [np.array([[1]]), np.array([[5]])] },
- { 'key': (None, slice(None,None)), 'expected': [np.array([[[1,2],[3,4]]]), np.array([[[5,6],[7,8]]])] },
+ { 'key': slice(0,1), 'expected': Arraytainer([np.array([[1,2]]), np.array([[5,6]])]) },
+ { 'key': (slice(0,1), slice(0,1)), 'expected': Arraytainer([np.array([[1]]), np.array([[5]])]) },
+ { 'key': (None, slice(None,None)), 'expected': Arraytainer([np.array([[[1,2],[3,4]]]), np.array([[[5,6],[7,8]]])]) },
  # Slice and tuple:
- { 'key': (slice(0,None), 1), 'expected': [np.array([2,4]), np.array([6,8])] },
- { 'key': (1, slice(None,1)), 'expected': [np.array([3]), np.array([7])] },
+ { 'key': (slice(0,None), 1), 'expected': Arraytainer([np.array([2,4]), np.array([6,8])]) },
+ { 'key': (1, slice(None,1)), 'expected': Arraytainer([np.array([3]), np.array([7])]) },
  # Array keys:
- { 'key': np.array([True, False]), 'expected': [np.array([[1,2]]), np.array([[5,6]])] },
- { 'key': np.array([[True, False], [False, True]]), 'expected': [np.array([1,4]), np.array([5,8])] },
+ { 'key': np.array([True, False]), 'expected': Arraytainer([np.array([[1,2]]), np.array([[5,6]])]) },
+ { 'key': np.array([[True, False], [False, True]]), 'expected': Arraytainer([np.array([1,4]), np.array([5,8])]) },
  # Arraytainer keys:
  { 'key': Arraytainer([np.array([True, False])]), 
    'expected': Arraytainer([np.array([[1,2]])]) },
@@ -119,18 +119,18 @@ jax_list_tests = [
  { 'key': 0, 'expected': jnp.array([[1,2],[3,4]]) },
  { 'key': 1, 'expected': jnp.array([[5,6],[7,8]]) },
  # Tuple keys:
- { 'key': (1,), 'expected': [jnp.array([3,4]), jnp.array([7,8])] },
- { 'key': (0,1), 'expected': [jnp.array(2), jnp.array(6)] },
+ { 'key': (1,), 'expected': Jaxtainer([jnp.array([3,4]), jnp.array([7,8])]) },
+ { 'key': (0,1), 'expected': Jaxtainer([jnp.array(2), jnp.array(6)]) },
  # Slice key:
- { 'key': slice(0,1), 'expected': [jnp.array([[1,2]]), jnp.array([[5,6]])] },
- { 'key': (slice(0,1), slice(0,1)), 'expected': [jnp.array([[1]]), jnp.array([[5]])] },
- { 'key': (None, slice(None,None)), 'expected': [jnp.array([[[1,2],[3,4]]]), jnp.array([[[5,6],[7,8]]])] },
+ { 'key': slice(0,1), 'expected': Jaxtainer([jnp.array([[1,2]]), jnp.array([[5,6]])]) },
+ { 'key': (slice(0,1), slice(0,1)), 'expected': Jaxtainer([jnp.array([[1]]), jnp.array([[5]])]) },
+ { 'key': (None, slice(None,None)), 'expected': Jaxtainer([jnp.array([[[1,2],[3,4]]]), jnp.array([[[5,6],[7,8]]])]) },
  # Slice and tuple:
- { 'key': (slice(0,None), 1), 'expected': [jnp.array([2,4]), jnp.array([6,8])] },
- { 'key': (1, slice(None,1)), 'expected': [jnp.array([3]), jnp.array([7])] },
+ { 'key': (slice(0,None), 1), 'expected': Jaxtainer([jnp.array([2,4]), jnp.array([6,8])]) },
+ { 'key': (1, slice(None,1)), 'expected': Jaxtainer([jnp.array([3]), jnp.array([7])]) },
  # Array keys:
- { 'key': jnp.array([True, False]), 'expected': [jnp.array([[1,2]]), jnp.array([[5,6]])] },
- { 'key': jnp.array([[True, False], [False, True]]), 'expected': [jnp.array([1,4]), jnp.array([5,8])] },
+ { 'key': jnp.array([True, False]), 'expected': Jaxtainer([jnp.array([[1,2]]), jnp.array([[5,6]])]) },
+ { 'key': jnp.array([[True, False], [False, True]]), 'expected': Jaxtainer([jnp.array([1,4]), jnp.array([5,8])]) },
  # Jaxtainer keys:
  { 'key': Jaxtainer([jnp.array([True, False])]), 
    'expected': Jaxtainer([jnp.array([[1,2]])]) },

@@ -34,6 +34,7 @@ def assert_arrays_equal(output, expected, approx_equal=False):
 def assert_contents_equal(output, expected, approx_equal=False):
     assert isinstance(output, (list, dict, tuple, Arraytainer))
     assert isinstance(expected, (list, dict, tuple, Arraytainer))
+    assert type(output) == type(expected)
     output_keys = range(len(output)) if isinstance(output, (list, tuple)) else output.keys()
     expected_keys = range(len(expected)) if isinstance(expected, (list, tuple)) else expected.keys()
     assert output_keys == expected_keys

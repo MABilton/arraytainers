@@ -8,12 +8,12 @@ from collections.abc import Iterable, Sequence, MutableMapping, MutableSequence
 class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     def __init__(self, contents, array_conversions=True, dtype=None, deepcopy=True):
-        if not isinstance(contents, (list, dict)):
+        if not (self.is_list(contents) or self.is_dict(contents)):
             raise ValueError(f'contents must be either list-like or dict-like, not {type(contents)}.')
-        if deepcopy:
-            contents = self._deepcopy_contents(contents)
         if self.is_dict(contents) and self._keys_contain_tuple(contents):
             raise KeyError("contents.keys() contains a tuple, which isn't allowed in an Arraytainer.")
+        if deepcopy:
+            contents = self._deepcopy_contents(contents)
         contents = self._recursive_arraytainer_conversion(contents, dtype, array_conversions)
         self._contents = contents
         self._dtype = dtype
@@ -34,53 +34,62 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
 
     @classmethod
     def from_array(cls, array, shapes, order='C'):
-        # Concatenate shapes tuple into a single arraytainer
-        shapes = cls.by_concatenation(shapes)
+        if isinstance(shapes, Sequence):
+            try:
+                shapes = cls._concatenate_values_into_arraytainer(shapes)
+            except ValueError:
+                raise ValueError('shapes must contain at least one arraytainer, list, or dict.')
         # Ensure correct number of elements in array:
-        total_size = shapes.size
-        if total_size != array.size:
-            raise ValueError(f"""Array contains {array.size} elements, but shapes 
-                                 contains {total_size} elements.""")
-        vector = array.flatten(order=order)
-        contents, _ = cls._createcontents_from_vector(vector, shapes, order)
+        output_size = shapes.sum()
+        if output_size != array.size:
+            ValueError(f"Array contains {array.size} elements, but shapes specifies {output_size} elements.")
+        vector = array.flatten()
+        contents, _ = cls._from_vector(vector, shapes, order)
         return cls(contents)
 
     @classmethod
-    def _createcontents_from_vector(cls, vector, shapes, order, vector_idx=None):
+    def _from_vector(cls, vector, shapes, order, vector_idx=None):
         if vector_idx is None:
             vector_idx = 0
         contents = {}
         for key, shape in shapes.items():
             if isinstance(shape, Arraytainer):
-                contents[key], vector_idx = cls._createcontents_from_vector(vector, shape, order, vector_idx)
+                contents[key], vector_idx = cls._from_vector(vector, shape, order, vector_idx)
             else:
                 num_elem = shape.prod(dtype=int)
                 array_vals = vector[vector_idx:vector_idx+num_elem]
                 vector_idx = vector_idx + num_elem
-                newcontents[key] = array_vals.reshape(shape, order=order)
+                contents[key] = array_vals.reshape(shape, order=order)
         if shapes.contents_type is list:
             contents = list(contents.values())
         return contents, vector_idx
 
     @classmethod
-    def by_concatenation(cls, *values, dtype=None):
-        if len(values)==1 and isinstance(values[0], Iterable) and not (cls.is_array(values[0]) or isinstance(values, Arraytainer)):
-            values = values[0]
-        val_is_arraytainer = [isinstance(val, Arraytainer) for val in values]
-        if not any(val_is_arraytainer):
-            raise ValueError('Must contain at least one arraytainer.')
-        to_concat = []
-        for idx, val_i in enumerate(values):
-            if isinstance(val_i, Arraytainer):
-                val_i = np.atleast_1d(val_i)
-            elif not cls.is_array(val_i):
-                val_i = cls.create_array(val_i, dtype)
-                # Shape arrays must have at least one dimension for concatenate:
-                if val_i.ndim == 0:
-                    val_i = val_i[None]
-            to_concat.append(val_i)
-        concatenated = np.concatenate(to_concat)
-        return concatenated
+    def _concatenate_values_into_arraytainer(cls, values):
+        if len(values)==1:
+            output = values[0]
+            if cls.is_list(output) or cls.is_dict(output):
+                output = cls(output)
+            elif not isinstance(output, Arraytainer):
+                raise ValueError('Single entry in values is not an arraytainer.')
+        else:
+            val_is_arraytainer = [isinstance(val, Arraytainer) for val in values]
+            if not any(val_is_arraytainer):
+                raise ValueError('values must contain at least one arraytainer.')
+            to_concat = []
+            for idx, val_i in enumerate(values):
+                if isinstance(val_i, Arraytainer):
+                    val_i = np.atleast_1d(val_i)
+                elif cls.is_list(val_i) or cls.is_dict(val_i):
+                    val_i = np.atleast_1d(cls(val_i))
+                else:
+                    val_i = cls.create_array(val_i)
+                    # Shape arrays must have at least one dimension for concatenate:
+                    if val_i.ndim == 0:
+                        val_i = val_i[None]
+                to_concat.append(val_i)
+            output = np.concatenate(to_concat)
+        return output
 
     def __len__(self):
         return len(self.contents)
@@ -270,12 +279,10 @@ class Arraytainer(np.lib.mixins.NDArrayOperatorsMixin):
         return sum(arraytainer_of_scalars.list_arrays())
 
     def reshape(self, *new_shapes, order='C'):
-        if len(new_shapes)==1:
+        if len(new_shapes)==1 and isinstance(new_shapes[0], Sequence):
             new_shapes = new_shapes[0]
-        if not isinstance(new_shapes, Arraytainer):
-            is_arraytainer = [isinstance(shape, Arraytainer) for shape in new_shapes]
-            if any(is_arraytainer) and not all(is_arraytainer):
-                new_shapes = self.__class__.by_concatenation(new_shapes)
+        if any(isinstance(shape, Arraytainer) for shape in new_shapes):
+            new_shapes = self._concatenate_values_into_arraytainer(new_shapes)                
         return np.reshape(self, new_shapes, order=order)
 
     def flatten(self, order='C'):
